@@ -1,0 +1,866 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-10-03T17:00:30.098Z",
+  "title": "Design System: ระดับน้ำท่าน้ำนนท์ (Nont Water)",
+  "extensions": {
+    "colorMeta": {
+      "ground": {
+        "role": "neutral",
+        "displayName": "Whitewashed Louvre",
+        "canonical": "#e4e6e1",
+        "oklch": "oklch(92.2% 0.007 124.5)",
+        "tonalRamp": [
+          "#0a0c09",
+          "#232521",
+          "#41433f",
+          "#626460",
+          "#858782",
+          "#aaaca7",
+          "#cdceca",
+          "#edefea"
+        ]
+      },
+      "slat": {
+        "role": "neutral",
+        "displayName": "Lit Slat",
+        "canonical": "#eceee9",
+        "oklch": "oklch(94.6% 0.007 124.5)",
+        "tonalRamp": [
+          "#0a0c09",
+          "#232521",
+          "#41433f",
+          "#626460",
+          "#858782",
+          "#aaaca7",
+          "#cdceca",
+          "#edefea"
+        ]
+      },
+      "slat-edge": {
+        "role": "neutral",
+        "displayName": "Slat Shadow",
+        "canonical": "#c3c8c1",
+        "oklch": "oklch(82.7% 0.011 136.6)",
+        "tonalRamp": [
+          "#090c08",
+          "#222520",
+          "#40443e",
+          "#60655f",
+          "#838881",
+          "#a8aca6",
+          "#cacfc8",
+          "#ebf0e9"
+        ]
+      },
+      "ink": {
+        "role": "primary",
+        "displayName": "Eave Shadow Ink",
+        "canonical": "#1e2b2a",
+        "oklch": "oklch(27.7% 0.018 190.3)",
+        "tonalRamp": [
+          "#030e0d",
+          "#1a2726",
+          "#384644",
+          "#586765",
+          "#7b8a88",
+          "#9fafad",
+          "#c1d2d0",
+          "#e2f3f1"
+        ]
+      },
+      "ink-2": {
+        "role": "neutral",
+        "displayName": "Secondary Ink",
+        "canonical": "#4a5755",
+        "oklch": "oklch(44.5% 0.017 185.4)",
+        "tonalRamp": [
+          "#040d0c",
+          "#1b2725",
+          "#394543",
+          "#596664",
+          "#7c8a87",
+          "#a0aeac",
+          "#c2d1cf",
+          "#e3f2f0"
+        ]
+      },
+      "on-ink": {
+        "role": "neutral",
+        "displayName": "On Ink",
+        "canonical": "#f1f2ee",
+        "oklch": "oklch(95.9% 0.005 117.9)",
+        "tonalRamp": [
+          "#0b0b09",
+          "#242421",
+          "#424340",
+          "#636460",
+          "#868783",
+          "#aaaba7",
+          "#cdceca",
+          "#eeefeb"
+        ]
+      },
+      "river": {
+        "role": "primary",
+        "displayName": "Chao Phraya Silt",
+        "canonical": "#7a6235",
+        "oklch": "oklch(51.0% 0.070 81.8)",
+        "tonalRamp": [
+          "#190600",
+          "#341f00",
+          "#553e0e",
+          "#775f32",
+          "#9b8255",
+          "#c1a778",
+          "#e5ca9a",
+          "#ffebba"
+        ]
+      },
+      "river-soft": {
+        "role": "primary",
+        "displayName": "Silt Wash (22% river)",
+        "canonical": "rgb(122 98 53 / 0.22)",
+        "tonalRamp": [
+          "#190600",
+          "#341f00",
+          "#553e0e",
+          "#775f32",
+          "#9b8255",
+          "#c1a778",
+          "#e5ca9a",
+          "#ffebba"
+        ]
+      },
+      "watch": {
+        "role": "secondary",
+        "displayName": "Balustrade Brick",
+        "canonical": "#b65a2c",
+        "oklch": "oklch(57.1% 0.133 45.0)",
+        "tonalRamp": [
+          "#210000",
+          "#441000",
+          "#6e2b03",
+          "#9a481d",
+          "#c16d45",
+          "#e19674",
+          "#ffbc9f",
+          "#ffe0c7"
+        ]
+      },
+      "danger": {
+        "role": "secondary",
+        "displayName": "Hall Red",
+        "canonical": "#a3201a",
+        "oklch": "oklch(46.6% 0.168 28.4)",
+        "tonalRamp": [
+          "#220000",
+          "#460b08",
+          "#702720",
+          "#9d4339",
+          "#c4685c",
+          "#e49286",
+          "#ffb9ae",
+          "#ffddd3"
+        ]
+      },
+      "gilt": {
+        "role": "tertiary",
+        "displayName": "Signboard Gilt",
+        "canonical": "#c9a227",
+        "oklch": "oklch(72.8% 0.138 89.7)",
+        "tonalRamp": [
+          "#170700",
+          "#352000",
+          "#583e00",
+          "#7f5e00",
+          "#a28218",
+          "#c4a85a",
+          "#e4cc8b",
+          "#ffedb7"
+        ]
+      },
+      "stile": {
+        "role": "neutral",
+        "displayName": "Shutter Frame",
+        "canonical": "#1e2b2a",
+        "oklch": "oklch(27.7% 0.018 190.3)",
+        "tonalRamp": [
+          "#030e0d",
+          "#1a2726",
+          "#384644",
+          "#586765",
+          "#7b8a88",
+          "#9fafad",
+          "#c1d2d0",
+          "#e2f3f1"
+        ]
+      },
+      "interior": {
+        "role": "neutral",
+        "displayName": "Dark Room",
+        "canonical": "#2c3836",
+        "oklch": "oklch(32.9% 0.016 184.1)",
+        "tonalRamp": [
+          "#040d0c",
+          "#1b2725",
+          "#394543",
+          "#596664",
+          "#7c8a87",
+          "#a0aeac",
+          "#c3d1cf",
+          "#e3f2f0"
+        ]
+      },
+      "blade-wet": {
+        "role": "neutral",
+        "displayName": "Wet Blade",
+        "canonical": "#7a6235",
+        "oklch": "oklch(51.0% 0.070 81.8)",
+        "tonalRamp": [
+          "#190600",
+          "#341f00",
+          "#553e0e",
+          "#775f32",
+          "#9b8255",
+          "#c1a778",
+          "#e5ca9a",
+          "#ffebba"
+        ]
+      },
+      "action-bg": {
+        "role": "primary",
+        "displayName": "Action Fill",
+        "canonical": "#1e2b2a",
+        "oklch": "oklch(27.7% 0.018 190.3)",
+        "tonalRamp": [
+          "#030e0d",
+          "#1a2726",
+          "#384644",
+          "#586765",
+          "#7b8a88",
+          "#9fafad",
+          "#c1d2d0",
+          "#e2f3f1"
+        ]
+      },
+      "action-fg": {
+        "role": "primary",
+        "displayName": "Action Text",
+        "canonical": "#f1f2ee",
+        "oklch": "oklch(95.9% 0.005 117.9)",
+        "tonalRamp": [
+          "#0b0b09",
+          "#242421",
+          "#424340",
+          "#636460",
+          "#868783",
+          "#aaaba7",
+          "#cdceca",
+          "#eeefeb"
+        ]
+      },
+      "head-normal": {
+        "role": "neutral",
+        "displayName": "Normal Band",
+        "canonical": "#22302f",
+        "oklch": "oklch(29.6% 0.019 190.7)",
+        "tonalRamp": [
+          "#030e0d",
+          "#192726",
+          "#374645",
+          "#576766",
+          "#7a8a89",
+          "#9eafad",
+          "#c1d2d0",
+          "#e1f3f1"
+        ]
+      },
+      "head-watch": {
+        "role": "secondary",
+        "displayName": "Watch Band",
+        "canonical": "#b65a2c",
+        "oklch": "oklch(57.1% 0.133 45.0)",
+        "tonalRamp": [
+          "#210000",
+          "#441000",
+          "#6e2b03",
+          "#9a481d",
+          "#c16d45",
+          "#e19674",
+          "#ffbc9f",
+          "#ffe0c7"
+        ]
+      },
+      "head-danger": {
+        "role": "secondary",
+        "displayName": "Danger Band",
+        "canonical": "#a3201a",
+        "oklch": "oklch(46.6% 0.168 28.4)",
+        "tonalRamp": [
+          "#220000",
+          "#460b08",
+          "#702720",
+          "#9d4339",
+          "#c4685c",
+          "#e49286",
+          "#ffb9ae",
+          "#ffddd3"
+        ]
+      },
+      "sign-alert": {
+        "role": "neutral",
+        "displayName": "Alert Sign White",
+        "canonical": "#ffffff",
+        "oklch": "oklch(100.0% 0.000 89.9)",
+        "tonalRamp": [
+          "#0b0b0b",
+          "#242424",
+          "#424242",
+          "#636363",
+          "#868686",
+          "#ababab",
+          "#cecece",
+          "#eeeeee"
+        ]
+      },
+      "night-ground": {
+        "role": "neutral",
+        "displayName": "Night Ground",
+        "canonical": "#121a19",
+        "oklch": "oklch(20.9% 0.012 186.9)",
+        "tonalRamp": [
+          "#060d0c",
+          "#1e2625",
+          "#3c4543",
+          "#5c6664",
+          "#7f8987",
+          "#a3adac",
+          "#c6d0cf",
+          "#e6f1f0"
+        ]
+      },
+      "night-slat": {
+        "role": "neutral",
+        "displayName": "Night Slat",
+        "canonical": "#5e6c68",
+        "oklch": "oklch(51.8% 0.018 176.5)",
+        "tonalRamp": [
+          "#040e0b",
+          "#1b2724",
+          "#394642",
+          "#596763",
+          "#7b8a86",
+          "#a0afaa",
+          "#c2d2cd",
+          "#e3f3ee"
+        ]
+      },
+      "night-slat-edge": {
+        "role": "neutral",
+        "displayName": "Night Slat Shadow",
+        "canonical": "#2b3734",
+        "oklch": "oklch(32.5% 0.017 178.3)",
+        "tonalRamp": [
+          "#040e0b",
+          "#1b2724",
+          "#394542",
+          "#596763",
+          "#7c8a86",
+          "#a0aeab",
+          "#c3d2ce",
+          "#e3f2ee"
+        ]
+      },
+      "night-ink": {
+        "role": "primary",
+        "displayName": "Night Ink",
+        "canonical": "#e3e6e0",
+        "oklch": "oklch(92.1% 0.009 128.6)",
+        "tonalRamp": [
+          "#0a0c08",
+          "#232520",
+          "#41433e",
+          "#62645f",
+          "#848782",
+          "#a9aca6",
+          "#cccfc9",
+          "#edf0ea"
+        ]
+      },
+      "night-ink-2": {
+        "role": "neutral",
+        "displayName": "Night Secondary Ink",
+        "canonical": "#a4aeaa",
+        "oklch": "oklch(74.2% 0.013 170.1)",
+        "tonalRamp": [
+          "#060d0a",
+          "#1e2623",
+          "#3c4541",
+          "#5d6662",
+          "#7f8985",
+          "#a3ada9",
+          "#c6d0cc",
+          "#e7f1ed"
+        ]
+      },
+      "night-river": {
+        "role": "primary",
+        "displayName": "Night Silt",
+        "canonical": "#9c7f45",
+        "oklch": "oklch(61.1% 0.084 83.3)",
+        "tonalRamp": [
+          "#190600",
+          "#371e00",
+          "#583d00",
+          "#7a5e23",
+          "#9f8248",
+          "#c5a66c",
+          "#e9c98e",
+          "#ffebb7"
+        ]
+      },
+      "night-watch": {
+        "role": "secondary",
+        "displayName": "Night Brick",
+        "canonical": "#e08a55",
+        "oklch": "oklch(71.3% 0.126 51.2)",
+        "tonalRamp": [
+          "#200000",
+          "#431200",
+          "#6c2d00",
+          "#984b0f",
+          "#be6f3d",
+          "#df986e",
+          "#fcbe9a",
+          "#ffe2c3"
+        ]
+      },
+      "night-danger": {
+        "role": "secondary",
+        "displayName": "Night Red",
+        "canonical": "#f0645b",
+        "oklch": "oklch(67.8% 0.175 26.4)",
+        "tonalRamp": [
+          "#220000",
+          "#460b0a",
+          "#702622",
+          "#9d423c",
+          "#c4675f",
+          "#e49188",
+          "#ffb8b0",
+          "#ffddd5"
+        ]
+      },
+      "night-gilt": {
+        "role": "tertiary",
+        "displayName": "Night Gilt (also action outline)",
+        "canonical": "#d9b649",
+        "oklch": "oklch(78.7% 0.132 91.1)",
+        "tonalRamp": [
+          "#160800",
+          "#342000",
+          "#573e00",
+          "#7d5f00",
+          "#a18318",
+          "#c3a95b",
+          "#e3cc8b",
+          "#ffeeb7"
+        ]
+      },
+      "night-stile": {
+        "role": "neutral",
+        "displayName": "Night Frame",
+        "canonical": "#3c4a47",
+        "oklch": "oklch(39.6% 0.019 180.9)",
+        "tonalRamp": [
+          "#030e0c",
+          "#1a2724",
+          "#384643",
+          "#586764",
+          "#7b8a87",
+          "#9fafab",
+          "#c1d2ce",
+          "#e2f3ef"
+        ]
+      },
+      "night-interior": {
+        "role": "neutral",
+        "displayName": "Night Dark Room",
+        "canonical": "#070b0a",
+        "oklch": "oklch(14.4% 0.007 179.6)",
+        "tonalRamp": [
+          "#080c0b",
+          "#202524",
+          "#3e4442",
+          "#5f6563",
+          "#828886",
+          "#a6acab",
+          "#c9cfce",
+          "#e9f0ee"
+        ]
+      },
+      "night-blade-wet": {
+        "role": "neutral",
+        "displayName": "Night Wet Blade",
+        "canonical": "#8a7140",
+        "oklch": "oklch(56.1% 0.074 83.0)",
+        "tonalRamp": [
+          "#190600",
+          "#351f00",
+          "#553e07",
+          "#785f2e",
+          "#9c8251",
+          "#c2a775",
+          "#e5ca97",
+          "#ffebb7"
+        ]
+      },
+      "night-action-bg": {
+        "role": "primary",
+        "displayName": "Deep Silt Action",
+        "canonical": "#2a2416",
+        "oklch": "oklch(26.3% 0.026 87.4)",
+        "tonalRamp": [
+          "#100a01",
+          "#292315",
+          "#484233",
+          "#696353",
+          "#8d8675",
+          "#b2aa99",
+          "#d5cdbb",
+          "#f6eedb"
+        ]
+      },
+      "night-action-fg": {
+        "role": "primary",
+        "displayName": "Pale Gilt Action Text",
+        "canonical": "#f0d98a",
+        "oklch": "oklch(88.7% 0.102 93.7)",
+        "tonalRamp": [
+          "#150800",
+          "#322100",
+          "#554000",
+          "#776102",
+          "#9b8535",
+          "#c0aa5c",
+          "#e0cd8c",
+          "#feeeb7"
+        ]
+      },
+      "night-head-normal": {
+        "role": "neutral",
+        "displayName": "Night Normal Band",
+        "canonical": "#0b1110",
+        "oklch": "oklch(17.1% 0.010 183.9)",
+        "tonalRamp": [
+          "#070d0c",
+          "#1f2624",
+          "#3d4443",
+          "#5e6564",
+          "#808887",
+          "#a5adab",
+          "#c7d0ce",
+          "#e8f1ef"
+        ]
+      },
+      "night-head-watch": {
+        "role": "secondary",
+        "displayName": "Night Watch Band",
+        "canonical": "#8e3f17",
+        "oklch": "oklch(46.6% 0.119 44.2)",
+        "tonalRamp": [
+          "#210000",
+          "#440f00",
+          "#6e2b05",
+          "#994922",
+          "#c06d47",
+          "#e19675",
+          "#ffbc9f",
+          "#ffe0c7"
+        ]
+      },
+      "night-head-danger": {
+        "role": "secondary",
+        "displayName": "Night Danger Band",
+        "canonical": "#7e1913",
+        "oklch": "oklch(38.9% 0.137 28.7)",
+        "tonalRamp": [
+          "#220000",
+          "#460b08",
+          "#70271f",
+          "#9d4339",
+          "#c4685c",
+          "#e49286",
+          "#ffb9ae",
+          "#ffddd3"
+        ]
+      }
+    },
+    "themes": [
+      {
+        "name": "light",
+        "selector": ":root",
+        "note": "default"
+      },
+      {
+        "name": "night",
+        "selector": ":root[data-theme=\"dark\"], @media (prefers-color-scheme: dark) :root:not([data-theme=\"light\"])",
+        "note": "Separate palette, not an inversion. Tokens keep the same --names; frontmatter night-* keys map onto them. Saved choice applied pre-paint from localStorage 'theme'. theme-color #22302F light / #0B1110 dark."
+      }
+    ],
+    "typographyMeta": {
+      "numeral": {
+        "displayName": "Level Numeral",
+        "purpose": "The current level only; sized from its column via container query (container-type: inline-size on the reading column)."
+      },
+      "wordmark": {
+        "displayName": "Signboard Wordmark",
+        "purpose": "Taviraj 600, gilt on the normal header, white at watch/danger. Nowhere else."
+      },
+      "headline": {
+        "displayName": "Headline",
+        "purpose": "Prose page h1."
+      },
+      "title": {
+        "displayName": "Section Title",
+        "purpose": "Section heads above a 2px ink rule."
+      },
+      "body": {
+        "displayName": "Body",
+        "purpose": "Running text; prose max 68ch."
+      },
+      "label": {
+        "displayName": "Label",
+        "purpose": "Reading label, facts, slats, notices, section subtitles."
+      },
+      "small": {
+        "displayName": "Small",
+        "purpose": "Timestamps, legends, choice descriptions."
+      }
+    },
+    "shadows": [
+      {
+        "name": "primary-hover-underline",
+        "value": "inset 0 -3px 0 var(--river)",
+        "purpose": "Primary button hover: an inset silt rule, not elevation. The only box-shadow in the system."
+      },
+      {
+        "name": "louvre-slat-edge",
+        "value": "fill rgb(0 0 0 / 0.35), 1.5px under each open blade",
+        "purpose": "Material shadow inside the louvre gauge only."
+      },
+      {
+        "name": "louvre-blade-overlap",
+        "value": "fill rgb(0 0 0 / 0.32), 2px seam atop each shut blade",
+        "purpose": "Material overlap inside the louvre gauge only."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-band",
+        "value": "background-color 400ms cubic-bezier(0.16, 1, 0.3, 1)",
+        "purpose": "Header band changing state colour."
+      },
+      {
+        "name": "blade-shut",
+        "value": "180ms steps(2, end), scaleY 0.43 -> 1, transform-origin top, 70ms stagger bottom blade first",
+        "purpose": "Submerged louvre blades swinging shut."
+      },
+      {
+        "name": "control",
+        "value": "150ms ease-out",
+        "purpose": "Button colour changes, disclosure arrow rotation."
+      },
+      {
+        "name": "press",
+        "value": "translateY(1px)",
+        "purpose": "Button :active."
+      },
+      {
+        "name": "reduced-motion",
+        "value": "none",
+        "purpose": "prefers-reduced-motion disables blade-shut and band transition."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "gutter-wide",
+        "value": "600px"
+      },
+      {
+        "name": "lead-fixed-louvre",
+        "value": "640px"
+      },
+      {
+        "name": "two-column-page",
+        "value": "1024px"
+      }
+    ],
+    "strokes": [
+      {
+        "name": "hairline",
+        "value": "1px solid var(--slat-edge)",
+        "purpose": "Rows, grid, choice separators."
+      },
+      {
+        "name": "control",
+        "value": "1.5px solid var(--ink)",
+        "purpose": "Buttons, slats, choices, selects, notices."
+      },
+      {
+        "name": "section",
+        "value": "2px solid var(--ink)",
+        "purpose": "Section heads, footer top."
+      },
+      {
+        "name": "empty",
+        "value": "1.5px dashed var(--slat-edge)",
+        "purpose": "Chart empty/error states."
+      }
+    ],
+    "focus": {
+      "default": "3px solid var(--ink), offset 3px",
+      "header": "outline-color #ffffff",
+      "slats": "river outline, offset -5px",
+      "choice": "3px solid var(--river), offset -3px"
+    }
+  },
+  "components": [
+    {
+      "name": "Header State Band",
+      "kind": "nav",
+      "refersTo": "header-band-normal",
+      "description": "Sticky 56px band filled with the state colour; gilt wordmark left, state word with shape icon right.",
+      "html": "<div class=\"ds-wrap\"><header class=\"ds-head\" data-status=\"normal\"><a class=\"ds-wordmark\" href=\"#\">ระดับน้ำท่าน้ำนนท์</a><p class=\"ds-state\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 20 20\" aria-hidden=\"true\"><circle cx=\"10\" cy=\"10\" r=\"7\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"/><circle cx=\"10\" cy=\"10\" r=\"2.5\" fill=\"currentColor\"/></svg>ปกติ</p></header><header class=\"ds-head\" data-status=\"watch\"><a class=\"ds-wordmark\" href=\"#\">ระดับน้ำท่าน้ำนนท์</a><p class=\"ds-state\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 20 20\" aria-hidden=\"true\"><path d=\"M10 2.5 18 17H2z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"round\"/><path d=\"M10 8v4.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><circle cx=\"10\" cy=\"14.6\" r=\"1.1\" fill=\"currentColor\"/></svg>เฝ้าระวัง</p></header><header class=\"ds-head\" data-status=\"danger\"><a class=\"ds-wordmark\" href=\"#\">ระดับน้ำท่าน้ำนนท์</a><p class=\"ds-state\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 20 20\" aria-hidden=\"true\"><path d=\"M6.9 2.5h6.2l4.4 4.4v6.2l-4.4 4.4H6.9l-4.4-4.4V6.9z\" fill=\"currentColor\"/><path d=\"M10 6v5\" stroke=\"#a3201a\" stroke-width=\"2\" stroke-linecap=\"round\"/><circle cx=\"10\" cy=\"13.6\" r=\"1.1\" fill=\"#a3201a\"/></svg>อันตราย</p></header></div>",
+      "css": ".ds-wrap{display:grid;gap:8px}.ds-head{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:56px;padding:0 16px;background:var(--head-normal,#22302f);color:#fff;transition:background-color 400ms cubic-bezier(0.16,1,0.3,1);font-family:Anuphan,\"Noto Sans Thai\",sans-serif}.ds-head[data-status=\"watch\"]{background:var(--head-watch,#b65a2c)}.ds-head[data-status=\"danger\"]{background:var(--head-danger,#a3201a)}.ds-wordmark{font-family:Taviraj,serif;font-weight:600;font-size:1.1875rem;letter-spacing:.01em;color:var(--sign-normal,#c9a227);text-decoration:none}.ds-head[data-status=\"watch\"] .ds-wordmark,.ds-head[data-status=\"danger\"] .ds-wordmark{color:#fff}.ds-wordmark:focus-visible{outline:3px solid #fff;outline-offset:3px}.ds-state{display:inline-flex;align-items:center;gap:8px;margin:0;font-weight:700}"
+    },
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Full-width 56px action filled with the action tokens; inset silt underline on hover.",
+      "html": "<button class=\"ds-btn-primary\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 20 20\" aria-hidden=\"true\"><path d=\"M10 3a4.5 4.5 0 0 0-4.5 4.5v2.8L4 13.5h12l-1.5-3.2V7.5A4.5 4.5 0 0 0 10 3Z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linejoin=\"round\"/><path d=\"M8.2 16a1.9 1.9 0 0 0 3.6 0\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.75\" stroke-linecap=\"round\"/></svg>เปิดการแจ้งเตือน</button>",
+      "css": ".ds-btn-primary{display:inline-flex;align-items:center;justify-content:center;gap:8px;width:100%;min-height:56px;padding:8px 24px;border:1.5px solid var(--action-line,#1e2b2a);border-radius:2px;background:var(--action-bg,#1e2b2a);color:var(--action-fg,#f1f2ee);font:600 1.0625rem Anuphan,\"Noto Sans Thai\",sans-serif;cursor:pointer;transition:background-color 150ms ease-out,color 150ms ease-out}.ds-btn-primary:hover{box-shadow:inset 0 -3px 0 var(--river,#7a6235)}.ds-btn-primary:active{transform:translateY(1px)}.ds-btn-primary:focus-visible{outline:3px solid var(--ink,#1e2b2a);outline-offset:3px}"
+    },
+    {
+      "name": "Outline Button",
+      "kind": "button",
+      "refersTo": "button-outline",
+      "description": "Default button: 1.5px ink stroke, slat fill on hover.",
+      "html": "<button class=\"ds-btn\">ส่งข้อความทดสอบ</button>",
+      "css": ".ds-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:48px;padding:8px 24px;border:1.5px solid var(--ink,#1e2b2a);border-radius:2px;background:transparent;color:var(--ink,#1e2b2a);font:600 1rem Anuphan,\"Noto Sans Thai\",sans-serif;cursor:pointer;transition:background-color 150ms ease-out}.ds-btn:hover{background:var(--slat,#eceee9)}.ds-btn:active{transform:translateY(1px)}.ds-btn:focus-visible{outline:3px solid var(--ink,#1e2b2a);outline-offset:3px}.ds-btn[disabled]{opacity:.55;cursor:not-allowed}"
+    },
+    {
+      "name": "Quiet Button",
+      "kind": "button",
+      "refersTo": "button-quiet",
+      "description": "Strokeless underlined action for cancel/reset.",
+      "html": "<button class=\"ds-btn-quiet\">ยกเลิก</button>",
+      "css": ".ds-btn-quiet{min-height:48px;padding:8px;border:0;background:transparent;color:var(--ink,#1e2b2a);font:600 1rem Anuphan,\"Noto Sans Thai\",sans-serif;text-decoration:underline;text-underline-offset:.2em;text-decoration-thickness:1px;cursor:pointer}.ds-btn-quiet:hover{text-decoration-thickness:2px}.ds-btn-quiet:focus-visible{outline:3px solid var(--ink,#1e2b2a);outline-offset:3px}"
+    },
+    {
+      "name": "Slats Segmented Control",
+      "kind": "chip",
+      "refersTo": "slats-option-selected",
+      "description": "Range tabs as slats; the chosen slat closes dark.",
+      "html": "<div class=\"ds-slats\" role=\"group\"><button aria-pressed=\"true\">24 ชม.</button><button aria-pressed=\"false\">7 วัน</button><button aria-pressed=\"false\">30 วัน</button></div>",
+      "css": ".ds-slats{display:inline-flex;border:1.5px solid var(--ink,#1e2b2a);border-radius:2px}.ds-slats>*+*{border-left:1.5px solid var(--ink,#1e2b2a)}.ds-slats button{min-height:44px;min-width:64px;padding:0 12px;border:0;background:transparent;color:var(--ink,#1e2b2a);font:600 .9375rem Anuphan,\"Noto Sans Thai\",sans-serif;cursor:pointer}.ds-slats button:hover{background:var(--slat,#eceee9)}.ds-slats button[aria-pressed=\"true\"]{background:var(--action-bg,#1e2b2a);color:var(--action-fg,#f1f2ee)}.ds-slats button:focus-visible{outline:3px solid var(--river,#7a6235);outline-offset:-5px}"
+    },
+    {
+      "name": "Choice Rows",
+      "kind": "input",
+      "refersTo": "choice-row-selected",
+      "description": "Radio group as stacked slats; checked row fills with the action tokens.",
+      "html": "<div class=\"ds-choices\"><label class=\"ds-choice\"><input type=\"radio\" name=\"f\" checked>ทุกเช้า</label><label class=\"ds-choice\"><input type=\"radio\" name=\"f\">ทุก 3 ชั่วโมง</label><label class=\"ds-choice\"><input type=\"radio\" name=\"f\">ปิด (เตือนเฉพาะเมื่อถึงเกณฑ์)</label></div>",
+      "css": ".ds-choices{display:grid;border:1.5px solid var(--ink,#1e2b2a);border-radius:2px;font-family:Anuphan,\"Noto Sans Thai\",sans-serif;color:var(--ink,#1e2b2a)}.ds-choice{display:flex;align-items:center;gap:12px;min-height:48px;padding:8px 12px;cursor:pointer}.ds-choice+.ds-choice{border-top:1px solid var(--slat-edge,#c3c8c1)}.ds-choice:hover{background:var(--slat,#eceee9)}.ds-choice input{width:20px;height:20px;margin:0;accent-color:var(--ink,#1e2b2a)}.ds-choice:has(input:checked){background:var(--action-bg,#1e2b2a);color:var(--action-fg,#f1f2ee)}.ds-choice:has(input:checked) input{accent-color:var(--action-fg,#f1f2ee)}.ds-choice:has(input:focus-visible){outline:3px solid var(--river,#7a6235);outline-offset:-3px}"
+    },
+    {
+      "name": "Select Field",
+      "kind": "input",
+      "refersTo": "select",
+      "description": "Inline select: 44px, ground fill, 1.5px ink stroke.",
+      "html": "<label class=\"ds-inline\">เวลา <select class=\"ds-select\"><option>07:00</option><option>18:00</option></select></label>",
+      "css": ".ds-inline{display:flex;align-items:center;gap:12px;font-family:Anuphan,\"Noto Sans Thai\",sans-serif;color:var(--ink,#1e2b2a)}.ds-select{min-height:44px;padding:0 12px;border:1.5px solid var(--ink,#1e2b2a);border-radius:2px;background:var(--ground,#e4e6e1);color:inherit;font:inherit}.ds-select:focus-visible{outline:3px solid var(--ink,#1e2b2a);outline-offset:3px}"
+    },
+    {
+      "name": "Louvre Gauge",
+      "kind": "custom",
+      "refersTo": "louvre",
+      "description": "Signature: open blades over the dark room above water, silted shut blades below, balustrade rails at thresholds, ink reading flag.",
+      "html": "<svg class=\"ds-louvre\" viewBox=\"0 0 212 164\" role=\"img\" aria-label=\"ระดับน้ำ 1.17 ม.\"><defs><pattern id=\"dsw\" width=\"10\" height=\"10\" patternUnits=\"userSpaceOnUse\"><rect width=\"10\" height=\"10\" fill=\"#e4e6e1\"/><rect x=\"1\" y=\"1\" width=\"8\" height=\"8\" fill=\"none\" stroke=\"#b65a2c\" stroke-width=\"1.6\"/><path d=\"M2.2 2.2 7.8 7.8M7.8 2.2 2.2 7.8\" stroke=\"#b65a2c\" stroke-width=\"1.4\"/></pattern><pattern id=\"dsd\" width=\"10\" height=\"10\" patternUnits=\"userSpaceOnUse\"><rect width=\"10\" height=\"10\" fill=\"#e4e6e1\"/><rect x=\"1\" y=\"1\" width=\"8\" height=\"8\" fill=\"none\" stroke=\"#a3201a\" stroke-width=\"1.6\"/><path d=\"M2.2 2.2 7.8 7.8M7.8 2.2 2.2 7.8\" stroke=\"#a3201a\" stroke-width=\"1.4\"/></pattern></defs><rect class=\"stile\" x=\"64\" y=\"6\" width=\"92\" height=\"152\"/><rect class=\"interior\" x=\"70\" y=\"12\" width=\"80\" height=\"140\"/><g class=\"open\"><rect class=\"slat\" x=\"70\" y=\"13\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"19\" width=\"80\" height=\"1.5\"/><rect class=\"slat\" x=\"70\" y=\"27\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"33\" width=\"80\" height=\"1.5\"/><rect class=\"slat\" x=\"70\" y=\"41\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"47\" width=\"80\" height=\"1.5\"/><rect class=\"slat\" x=\"70\" y=\"55\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"61\" width=\"80\" height=\"1.5\"/><rect class=\"slat\" x=\"70\" y=\"69\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"75\" width=\"80\" height=\"1.5\"/><rect class=\"slat\" x=\"70\" y=\"83\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"89\" width=\"80\" height=\"1.5\"/><rect class=\"slat\" x=\"70\" y=\"97\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"103\" width=\"80\" height=\"1.5\"/></g><rect class=\"water\" x=\"70\" y=\"110\" width=\"80\" height=\"42\"/><g class=\"shut\"><rect class=\"wet\" x=\"70\" y=\"110\" width=\"80\" height=\"14\"/><rect class=\"seam\" x=\"70\" y=\"110\" width=\"80\" height=\"2\"/><rect class=\"wet\" x=\"70\" y=\"124\" width=\"80\" height=\"14\"/><rect class=\"seam\" x=\"70\" y=\"124\" width=\"80\" height=\"2\"/><rect class=\"wet\" x=\"70\" y=\"138\" width=\"80\" height=\"14\"/><rect class=\"seam\" x=\"70\" y=\"138\" width=\"80\" height=\"2\"/></g><rect x=\"60\" y=\"31\" width=\"96\" height=\"10\" fill=\"url(#dsd)\"/><line x1=\"60\" x2=\"156\" y1=\"31\" y2=\"31\" stroke=\"#a3201a\" stroke-width=\"2\"/><text class=\"rail\" x=\"57\" y=\"32\" text-anchor=\"end\">อันตราย</text><text class=\"rail\" x=\"57\" y=\"48\" text-anchor=\"end\">2.50*</text><rect x=\"60\" y=\"73\" width=\"96\" height=\"10\" fill=\"url(#dsw)\"/><line x1=\"60\" x2=\"156\" y1=\"73\" y2=\"73\" stroke=\"#b65a2c\" stroke-width=\"2\"/><text class=\"rail\" x=\"57\" y=\"74\" text-anchor=\"end\">เฝ้าระวัง</text><text class=\"rail\" x=\"57\" y=\"90\" text-anchor=\"end\">2.20*</text><line class=\"waterline\" x1=\"70\" x2=\"160\" y1=\"110\" y2=\"110\"/><path class=\"flag\" d=\"M160 110 l6 -11 h46 v22 h-46 z\"/><text class=\"flagt\" x=\"168\" y=\"115\">1.17</text></svg>",
+      "css": ".ds-louvre{display:block;width:212px;height:auto;overflow:visible;font-family:Anuphan,\"Noto Sans Thai\",sans-serif;font-variant-numeric:tabular-nums lining-nums;color:var(--ink,#1e2b2a)}.ds-louvre .stile{fill:var(--stile,#1e2b2a)}.ds-louvre .interior{fill:var(--interior,#2c3836)}.ds-louvre .slat{fill:var(--slat,#eceee9)}.ds-louvre .edge{fill:rgb(0 0 0/.35)}.ds-louvre .water{fill:var(--river,#7a6235)}.ds-louvre .wet{fill:var(--blade-wet,#7a6235)}.ds-louvre .seam{fill:rgb(0 0 0/.32)}.ds-louvre .shut>*{transform-box:fill-box;transform-origin:top;animation:ds-shut 180ms steps(2,end) both}.ds-louvre .rail{font-size:13px;font-weight:700;fill:currentColor}.ds-louvre .waterline{stroke:var(--ink,#1e2b2a);stroke-width:2}.ds-louvre .flag{fill:var(--ink,#1e2b2a)}.ds-louvre .flagt{fill:var(--on-ink,#f1f2ee);font-size:14px;font-weight:700}@keyframes ds-shut{from{transform:scaleY(.43)}to{transform:scaleY(1)}}@media (prefers-reduced-motion:reduce){.ds-louvre .shut>*{animation:none}}"
+    },
+    {
+      "name": "Alert Log Row",
+      "kind": "custom",
+      "refersTo": "alert-log",
+      "description": "Hairline-ruled log; cleared alerts struck through, never deleted.",
+      "html": "<ul class=\"ds-log\"><li data-cleared=\"true\"><svg width=\"20\" height=\"20\" viewBox=\"0 0 20 20\" aria-hidden=\"true\" style=\"color:#b65a2c\"><path d=\"M10 2.5 18 17H2z\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linejoin=\"round\"/><path d=\"M10 8v4.5\" stroke=\"currentColor\" stroke-width=\"2\" stroke-linecap=\"round\"/><circle cx=\"10\" cy=\"14.6\" r=\"1.1\" fill=\"currentColor\"/></svg><span class=\"what\">เฝ้าระวัง 2.21 ม.</span><span class=\"when\">3 ต.ค. 21:40 น.</span><span class=\"by\">พ้นระดับเฝ้าระวัง 3 ต.ค. 23:10 น.</span></li></ul>",
+      "css": ".ds-log{margin:0;padding:0;list-style:none;font-family:Anuphan,\"Noto Sans Thai\",sans-serif;color:var(--ink,#1e2b2a);font-variant-numeric:tabular-nums}.ds-log li{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;padding:12px 0;border-bottom:1px solid var(--slat-edge,#c3c8c1)}.ds-log .when,.ds-log .by{grid-column:2;font-size:.875rem}.ds-log .when{color:var(--ink-2,#4a5755)}.ds-log .by{font-weight:600}.ds-log [data-cleared=\"true\"] .what{text-decoration:line-through;text-decoration-thickness:2px;text-decoration-color:var(--ink-2,#4a5755)}"
+    }
+  ],
+  "narrative": {
+    "northStar": "Old Hall Veranda",
+    "overview": "You read the river level through the louvred awnings of the 1910 Nonthaburi provincial hall, which faces the water at the pier. One blade equals 10 cm, the same step as the marks on the staff gauge. Above the water the blades stand open on a dark interior. Below it they are shut and silted. The watch and danger thresholds cross the shutter as brick-orange and red balustrade rails. Everything else on the surface comes from the same building: whitewashed ground, eave-shadow ink, Chao Phraya silt for water, the gilt of the signboard for the wordmark.\n\nThe system is flat and typographic. Hierarchy comes from scale: one very large tabular numeral, then plain Thai text at near-body sizes. Structure comes from 2px ink rules and hairline slat-edge rules, not from containers. The state of the river owns the whole header band. Night is a separate palette built for reading at 2 a.m., not an inversion of the day palette. It has its own deep-silt action colour, so no light slab ever appears in the dark.\n\nThe build has no cards, no drop shadows and no gradients. Status is never shown by colour alone.",
+    "keyCharacteristics": [
+      "A full-strength state colour fills the sticky header band. The wordmark sits left and the state word with its shape icon sits right.",
+      "A giant tabular numeral is sized by its own column (container query).",
+      "The louvre gauge is the signature instrument. Its geometry (rails, silt fill, waterline) repeats in the chart.",
+      "Choices are built as slats: segmented tabs and stacked option rows where the chosen slat closes dark.",
+      "Every corner is square (2px). Rules are 1px hairlines, 1.5px control strokes and 2px section rules.",
+      "Light and night are two separate palettes. The night palette is applied by `[data-theme=\"dark\"]` or by `prefers-color-scheme` unless the user has chosen light."
+    ],
+    "rules": [
+      {
+        "name": "The State Owns the Band Rule",
+        "body": "The sticky header is filled edge to edge with the current state colour: charcoal, then brick, then red. The background change takes 400ms ease-out-expo. The state word always carries its shape icon.",
+        "section": "colors"
+      },
+      {
+        "name": "The Gilt Is Signage Rule",
+        "body": "Gilt appears only as the wordmark on the dark normal header, plus the night action outline and text. It is never used as an accent elsewhere.",
+        "section": "colors"
+      },
+      {
+        "name": "The No Light Slab at Night Rule",
+        "body": "In night mode every selected or primary surface uses the night action tokens (deep silt fill, gilt text). Ink is never turned into a pale slab.",
+        "section": "colors"
+      },
+      {
+        "name": "The Shape Before Colour Rule",
+        "body": "Status always has a shape: a ringed circle for normal, a triangle for watch and a solid octagon for danger. These are drawn on a 20px grid with 1.75 to 2 strokes. Rails carry a text label and value as well as their colour.",
+        "section": "colors"
+      },
+      {
+        "name": "The One Big Number Rule",
+        "body": "Hierarchy comes from scale alone. The numeral is the only display-size text. Everything else stays between 0.8125rem and 1.75rem.",
+        "section": "typography"
+      },
+      {
+        "name": "The Tabular Figures Rule",
+        "body": "Every number (levels, times, axes, tables) uses `tabular-nums lining-nums` (the `.num` class).",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat Veranda Rule",
+        "body": "No drop shadows, no gradients, no cards. Depth is allowed only inside the louvre gauge, where it describes the shutter.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do fill the whole header band with the current state colour and pair the state word with its circle, triangle or octagon icon.",
+      "Do size the level numeral from its column with `clamp(4.5rem, 50cqi, 10rem)` and tabular lining figures.",
+      "Do draw thresholds as cross-in-square balustrade rails with a text label and value, and add an asterisk while they are provisional.",
+      "Do build choices as slats: a 1.5px ink frame, ink dividers, and the chosen slat filled with the action tokens.",
+      "Do use the action tokens (not ink) for any selected or primary fill, so night mode stays deep silt with gilt.",
+      "Do keep corners at 2px and separate sections with a 2px ink rule and white space."
+    ],
+    "donts": [
+      "Don't use cards, drop shadows or gradients. Depth belongs only to the louvre's blades.",
+      "Don't let colour carry status alone. Every state needs its shape or its word.",
+      "Don't use gilt outside the wordmark and the night action, and don't set Taviraj anywhere but the wordmark.",
+      "Don't delete alert-log entries. Strike them through when the water falls.",
+      "Don't set body text in watch on the light ground (3.72:1). It is a graphic and border colour in light mode."
+    ]
+  }
+}
