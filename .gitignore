@@ -42,3 +42,30 @@ next-env.d.ts
 
 # design review captures
 .impeccable/review/
+
+# AI tooling / agent files
+.claude/
+CLAUDE.md
+CLAUDE.local.md
+AGENTS.md
+GEMINI.md
+.cursor/
+.cursorrules
+.cursorignore
+.windsurf/
+.windsurfrules
+.aider*
+.codex/
+.gemini/
+.continue/
+.cline/
+.clinerules
+.roo/
+.roomodes
+.kiro/
+.copilot/
+.github/copilot-instructions.md
+.mcp.json
+.impeccable/
+anti-slop/
+graphify-out/
