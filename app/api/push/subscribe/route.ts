@@ -1,4 +1,4 @@
-import { initialPersonalState, personalThresholds, pointAhead, type AlertPreference } from "@/lib/alerts";
+import { initialPersonalState, personalThresholds, type AlertPreference } from "@/lib/alerts";
 import { readJson } from "@/lib/auth";
 import { getConfig } from "@/lib/config";
 import type { RepeatPref } from "@/lib/remind";
@@ -52,15 +52,11 @@ export async function POST(req: Request) {
   const alerts = sanitizeAlerts(body.alerts, existing?.alerts ?? "danger");
   const pointMoved = !existing || offsetCm !== (existing.offsetCm ?? 0);
   let alertState = existing?.alertState;
-  if (pointMoved || alerts !== existing?.alerts) {
-    const [config, latest] = await Promise.all([getConfig(), latestReading()]);
-    const level = latest?.level ?? null;
-    // A point picked under the water would never alert; the page may have shown an older level.
-    if (existing && !pointAhead(level, config.thresholds, alerts, offsetCm)) {
-      return Response.json({ error: "alert point is below the water", level }, { status: 409 });
-    }
+  if (pointMoved) {
     // Start from where the water already is, so picking a point never sends an alert by itself.
-    if (pointMoved) alertState = initialPersonalState(level, personalThresholds(config.thresholds, offsetCm), now);
+    // A point the water is already over starts at that level: reminders follow, then the all-clear.
+    const [config, latest] = await Promise.all([getConfig(), latestReading()]);
+    alertState = initialPersonalState(latest?.level ?? null, personalThresholds(config.thresholds, offsetCm), now);
   }
   const sub: Subscriber = {
     id,

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { OFFSET_CHOICES, firstOffsetAhead, personalThresholds, pointAhead, type AlertPreference } from "@/lib/alerts";
+import { OFFSET_CHOICES, personalThresholds, pointAhead, type AlertPreference } from "@/lib/alerts";
 import { STATUS_LABEL, cmBetween, formatEvery, formatOffset, thresholdGap, toGoWord } from "@/lib/format";
 import type { Estimate } from "@/lib/summary";
 import { externalBrowserUrl, type InAppBrowser } from "@/lib/inapp";
@@ -19,8 +19,6 @@ const EVERY_LABEL: Record<DigestEvery, string> = {
 };
 
 const pad = (h: number) => `${String(h).padStart(2, "0")}:00 น.`;
-
-const PASSED = "น้ำสูงเลยระดับนี้แล้ว";
 
 function digestSummary(d: DigestPref) {
   if (d.every === "off") return "ไม่รับข่าวตามรอบ";
@@ -56,6 +54,20 @@ function distanceToMine(level: number, estimate: Estimate | undefined, prefs: Pr
       : thresholdGap(level, mine, estimate);
   if (gap.over) return `ตอนนี้น้ำสูงกว่าจุดเตือนอันตรายของคุณ ${gap.cm} ซม.`;
   return `ตอนนี้${toGoWord(gap.estimate)} ${gap.cm} ซม. ถึงจุดเตือน${STATUS_LABEL[gap.target]}ของคุณ`;
+}
+
+/**
+ * Under a point the water is already over: no first alert will come, so say what will.
+ * The line above already says when the water is over the danger point.
+ */
+function passedNote(level: number, prefs: Prefs, watch: number, danger: number) {
+  const mine = personalThresholds({ watch, danger, hysteresis: 0, repeatStep: 0 }, prefs.offsetCm);
+  const status = Math.round(level * 100) >= Math.round(mine.danger * 100) ? "danger" : "watch";
+  const every = prefs.repeat[status];
+  const passed = status === "watch" ? "น้ำเลยจุดเตือนเฝ้าระวังของคุณแล้ว " : "";
+  return every
+    ? `${passed}จะได้เตือนซ้ำ${formatEvery(every)}จนน้ำลด`
+    : `${passed}ปิดเตือนซ้ำไว้ จะได้แจ้งอีกครั้งเมื่อน้ำลดพ้นจุดนี้`;
 }
 
 function Message({ push }: { push: PushApi }) {
@@ -259,18 +271,14 @@ export function NotifySettings({
     </label>
   );
 
-  // Alert points the water has already reached cannot be picked: they would never alert.
+  // Any point can be picked. One the water is already over starts there without an alert;
+  // the options say so, and reminders keep coming until the water falls.
   const th = { watch, danger };
-  const ahead = (pref: AlertPreference, o: number) => pointAhead(latestLevel, th, pref, o);
-  const passed = (pref: AlertPreference) => pref !== prefs.alerts && firstOffsetAhead(latestLevel, th, pref) === null;
-  /** Switching level keeps the point, or moves it up to the first one still above the water. */
-  const setAlerts = (alerts: AlertPreference) => {
-    const offsetCm = ahead(alerts, prefs.offsetCm) ? prefs.offsetCm : firstOffsetAhead(latestLevel, th, alerts);
-    if (offsetCm !== null) set({ alerts, offsetCm });
-  };
+  const ahead = (o: number) => pointAhead(latestLevel, th, prefs.alerts, o);
+  const setAlerts = (alerts: AlertPreference) => set({ alerts });
   const offsetOption = (o: number) => (
-    <option key={o} value={o} disabled={!ahead(prefs.alerts, o)}>
-      {ahead(prefs.alerts, o) ? formatOffset(o) : `${formatOffset(o)} (น้ำเลยจุดนี้แล้ว)`}
+    <option key={o} value={o}>
+      {ahead(o) ? formatOffset(o) : `${formatOffset(o)} (น้ำเลยจุดนี้แล้ว)`}
     </option>
   );
 
@@ -315,12 +323,11 @@ export function NotifySettings({
               type="radio"
               name="alerts"
               checked={prefs.alerts === "watch"}
-              disabled={passed("watch")}
               onChange={() => setAlerts("watch")}
             />
             <span>
               ระดับเฝ้าระวัง
-              <small>{passed("watch") ? PASSED : <>และระดับอันตราย{mark}</>}</small>
+              <small>และระดับอันตราย{mark}</small>
             </span>
           </label>
           <label className="choice">
@@ -328,13 +335,12 @@ export function NotifySettings({
               type="radio"
               name="alerts"
               checked={prefs.alerts === "danger"}
-              disabled={passed("danger")}
               onChange={() => setAlerts("danger")}
             />
             <span>
               ระดับอันตรายเท่านั้น
               <small className="num">
-                {passed("danger") ? PASSED : <>สูงกว่าระดับเฝ้าระวัง {cmBetween(danger, watch)} ซม.{mark}</>}
+                สูงกว่าระดับเฝ้าระวัง {cmBetween(danger, watch)} ซม.{mark}
               </small>
             </span>
           </label>
@@ -360,6 +366,9 @@ export function NotifySettings({
               <p className="field-note num" data-live="">
                 {distanceToMine(latestLevel, latestEstimate, prefs, watch, danger)}
               </p>
+            )}
+            {latestLevel !== null && !ahead(prefs.offsetCm) && (
+              <p className="field-note">{passedNote(latestLevel, prefs, watch, danger)}</p>
             )}
           </>
         )}

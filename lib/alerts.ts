@@ -32,7 +32,7 @@ export function personalThresholds(th: Thresholds, offsetCm: number): Thresholds
 
 /**
  * Whether the water is still below the first point `pref` alerts at for someone at `offsetCm`.
- * A point the water is already at or over can never alert: picking it starts the device there.
+ * A point the water is already at or over sends no first alert: picking it starts the device there.
  */
 export function pointAhead(
   level: number | null,
@@ -42,15 +42,6 @@ export function pointAhead(
 ): boolean {
   if (pref === "off" || level === null) return true;
   return Math.round(th[pref] * 100) + offsetCm > Math.round(level * 100);
-}
-
-/** The earliest offset still ahead of the water for `pref`, or null once the water is past them all. */
-export function firstOffsetAhead(
-  level: number | null,
-  th: Pick<Thresholds, "watch" | "danger">,
-  pref: AlertPreference,
-): number | null {
-  return OFFSET_CHOICES.find((o) => pointAhead(level, th, pref, o)) ?? null;
 }
 
 export type AlertState = {
