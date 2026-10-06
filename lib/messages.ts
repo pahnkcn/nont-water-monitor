@@ -18,6 +18,14 @@ export type PushMessage = {
 
 const PLACE = "ท่าน้ำนนท์";
 
+/** A camera picture older than this no longer shows the river as it is. */
+const FRESH_PICTURE_MS = 30 * 60 * 1000;
+
+/** The camera picture to attach to a notification, while it is still current. */
+export function snapshotImage(snap: { t: number } | null, now: number): string | undefined {
+  return snap && now - snap.t <= FRESH_PICTURE_MS ? `/api/snapshot?t=${snap.t}` : undefined;
+}
+
 /**
  * `e` comes from the subscriber's own alert point (site thresholds moved by `offsetCm`),
  * but every distance in the text is measured against the site thresholds in `th`.
@@ -74,9 +82,9 @@ export function digestMessage(
   summary: Summary,
   status: Status,
   th: Thresholds,
-  opts: { lastFailureAt: number | null; stale: boolean },
+  opts: { lastFailureAt: number | null; stale: boolean; snapshotUrl?: string },
 ): PushMessage {
-  const base = { tag: "digest" as const, url: "/", urgency: "low" as const, ttl: 30 * 60 };
+  const base = { tag: "digest" as const, url: "/", urgency: "low" as const, ttl: 30 * 60, image: opts.snapshotUrl };
   const latest = summary.latest;
   if (!latest) {
     return { ...base, title: `ระดับน้ำ${PLACE}`, body: "ยังไม่มีค่าที่อ่านได้จากกล้อง" };
@@ -97,7 +105,7 @@ export function digestMessage(
   };
 }
 
-export function testMessage(summary: Summary, status: Status, th: Thresholds): PushMessage {
+export function testMessage(summary: Summary, status: Status, th: Thresholds, opts: { snapshotUrl?: string } = {}): PushMessage {
   const latest = summary.latest;
   return {
     title: "การแจ้งเตือนใช้งานได้",
@@ -106,6 +114,7 @@ export function testMessage(summary: Summary, status: Status, th: Thresholds): P
       : "เครื่องนี้จะได้รับข่าวระดับน้ำตามรอบที่เลือก",
     tag: "test",
     url: "/",
+    image: opts.snapshotUrl,
     urgency: "normal",
     ttl: 10 * 60,
   };

@@ -5,7 +5,7 @@ import { getConfig, type SiteConfig } from "./config";
 import { DARK_LUMA, frameMeanLuma, readGauge } from "./gauge";
 import { judgeJump, type LevelAt } from "./jump";
 import { KEYS, kv } from "./kv";
-import { alertMessage, digestMessage, systemMessage, type PushMessage, type SystemNotice } from "./messages";
+import { alertMessage, digestMessage, snapshotImage, systemMessage, type PushMessage, type SystemNotice } from "./messages";
 import { mapLimit, sendPush } from "./push";
 import { isDigestDue } from "./schedule";
 import {
@@ -14,6 +14,7 @@ import {
   allSubscribers,
   applyRoundUpdates,
   getGaugeRefs,
+  getSnapshotMeta,
   getState,
   logEvents,
   readingsSince,
@@ -202,11 +203,11 @@ async function notify(round: {
   const subs = await allSubscribers();
   if (!subs.length) return;
 
-  const readings = await readingsSince(now - 26 * HOUR);
+  const [readings, snap] = await Promise.all([readingsSince(now - 26 * HOUR), getSnapshotMeta()]);
   const summary = summarize(readings, now);
-  const snapshotUrl = `/api/snapshot?t=${state.lastRead?.t ?? now}`;
+  const snapshotUrl = snapshotImage(snap, now);
   const stale = state.lastSuccessAt === null || now - state.lastSuccessAt > STALE_AFTER_MS;
-  const digest = digestMessage(summary, state.alert.status, thresholds, { lastFailureAt: state.failingSince, stale });
+  const digest = digestMessage(summary, state.alert.status, thresholds, { lastFailureAt: state.failingSince, stale, snapshotUrl });
   const system = round.notices.map(systemMessage);
 
   type Job = { sub: Subscriber; msg: PushMessage; kind: "alerts" | "digests" | "system" };

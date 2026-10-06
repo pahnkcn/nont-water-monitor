@@ -195,6 +195,13 @@ describe("a morning of rounds", () => {
     expect(sent.filter((s) => s.to !== "ADMIN" && s.msg.tag === "system")).toEqual([]);
   });
 
+  it("attaches this round's camera picture, and none while the camera is down", () => {
+    expect(of("A", "alert").every((s) => s.msg.image === `/api/snapshot?t=${s.at}`)).toBe(true);
+    // 11:00 falls in the outage; the last picture is from 10:10
+    expect(times(of("A", "digest").filter((s) => !s.msg.image))).toEqual(["11:00"]);
+    expect(of("A", "digest").filter((s) => s.msg.image).every((s) => s.msg.image === `/api/snapshot?t=${s.at}`)).toBe(true);
+  });
+
   it("never puts a metre value in any notification", () => {
     expect(sent.filter((s) => /\d\.\d\d ม\./.test(s.msg.title + s.msg.body))).toEqual([]);
   });

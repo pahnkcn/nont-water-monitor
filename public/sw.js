@@ -15,7 +15,8 @@ self.addEventListener("push", (event) => {
     tag: data.tag || "digest",
     renotify: data.tag === "alert",
     requireInteraction: Boolean(data.requireInteraction),
-    icon: "/icons/icon-192.png",
+    // The camera picture doubles as the thumbnail, so the collapsed notification shows the river too.
+    icon: data.image || "/icons/icon-192.png",
     badge: "/icons/badge-96.png",
     lang: "th",
     data: { url: data.url || "/" },

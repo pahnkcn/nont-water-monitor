@@ -1,8 +1,8 @@
 import { readJson, siteOrigin } from "@/lib/auth";
 import { getConfig } from "@/lib/config";
-import { testMessage } from "@/lib/messages";
+import { snapshotImage, testMessage } from "@/lib/messages";
 import { sendPush } from "@/lib/push";
-import { getState, getSubscriber, readingsSince, removeSubscribers, saveSubscribers, subscriberId } from "@/lib/store";
+import { getSnapshotMeta, getState, getSubscriber, readingsSince, removeSubscribers, saveSubscribers, subscriberId } from "@/lib/store";
 import { summarize } from "@/lib/summary";
 
 const MIN_INTERVAL_MS = 60_000;
@@ -16,10 +16,15 @@ export async function POST(req: Request) {
   if (sub.lastTestAt && now - sub.lastTestAt < MIN_INTERVAL_MS) {
     return Response.json({ error: "wait a minute between tests" }, { status: 429 });
   }
-  const [state, readings, config] = await Promise.all([getState(), readingsSince(now - 26 * 60 * 60 * 1000), getConfig()]);
+  const [state, readings, config, snap] = await Promise.all([
+    getState(),
+    readingsSince(now - 26 * 60 * 60 * 1000),
+    getConfig(),
+    getSnapshotMeta(),
+  ]);
   const res = await sendPush(
     sub.target,
-    testMessage(summarize(readings, now), state.alert.status, config.thresholds),
+    testMessage(summarize(readings, now), state.alert.status, config.thresholds, { snapshotUrl: snapshotImage(snap, now) }),
     siteOrigin(req),
   );
   if (!res.ok && res.gone) {
