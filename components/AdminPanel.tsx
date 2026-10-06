@@ -6,7 +6,8 @@ import { MAX_REFS, type TrackingStatus } from "@/lib/autotrack";
 import type { SiteConfig } from "@/lib/config";
 import { REASON_LABEL, STATUS_LABEL, describeMove, formatDateTime } from "@/lib/format";
 import type { GaugeConfig } from "@/lib/gauge-config";
-import type { SiteState, SnapshotMeta } from "@/lib/store";
+import { MAX_SUSPECTS } from "@/lib/jump";
+import type { SiteState, SnapshotMeta, Suspect } from "@/lib/store";
 import type { PushProblem } from "@/lib/push";
 import { IDENTITY, applyTransform } from "@/lib/track";
 import { pushSubscription } from "./usePush";
@@ -18,6 +19,7 @@ type AdminData = {
   subscribers: number;
   refs: { t: number; meanLuma: number }[];
   push: { subject: string | null; problems: PushProblem[] };
+  suspects: Suspect[];
 };
 
 const PUSH_PROBLEM: Record<PushProblem, string> = {
@@ -235,6 +237,8 @@ export function AdminPanel() {
         </p>
       </section>
 
+      <SuspectRounds suspects={data.suspects} password={password} />
+
       <section className="section">
         <div className="section__head">
           <h2 className="section__title">เกณฑ์การเตือน</h2>
@@ -426,6 +430,92 @@ export function AdminPanel() {
 type DevicePhase = "checking" | "unsupported" | "off" | "on" | "working";
 
 /** Lets the admin's own phone receive camera and tracking notices. */
+const metres = (s: { level: number; estimate?: Suspect["estimate"] }) =>
+  `${s.estimate === "below" ? "ต่ำกว่า " : s.estimate === "approx" ? "ประมาณ " : ""}${s.level.toFixed(2)} ม.`;
+
+/** Rounds held back as jumps or read with low confidence, each with the picture the reader saw. */
+function SuspectRounds({ suspects, password }: { suspects: Suspect[]; password: string }) {
+  const [open, setOpen] = useState<{ t: number; url: string | null; error: string | null } | null>(null);
+
+  // Revoke each picture's object URL once another replaces it or the list closes.
+  useEffect(() => {
+    const url = open?.url;
+    return () => {
+      if (url) URL.revokeObjectURL(url);
+    };
+  }, [open?.url]);
+
+  const show = async (s: Suspect, i: number) => {
+    if (open?.t === s.t) return setOpen(null);
+    setOpen({ t: s.t, url: null, error: null });
+    try {
+      const res = await fetch(`/api/admin/suspects?i=${i}&t=${s.t}`, { headers: { "x-admin-password": password } });
+      if (res.status === 404) throw new Error("ภาพนี้ไม่อยู่ในรายการแล้ว มีรอบใหม่เข้ามาแทน โหลดหน้านี้ใหม่");
+      if (!res.ok) throw new Error(`โหลดภาพไม่สำเร็จ (${res.status})`);
+      const url = URL.createObjectURL(await res.blob());
+      setOpen((o) => (o?.t === s.t ? { ...o, url } : (URL.revokeObjectURL(url), o)));
+    } catch (e) {
+      setOpen((o) => (o?.t === s.t ? { ...o, error: (e as Error).message } : o));
+    }
+  };
+
+  return (
+    <section className="section" aria-labelledby="suspects-title">
+      <div className="section__head">
+        <h2 className="section__title" id="suspects-title">
+          รอบที่ค่าน่าสงสัย
+        </h2>
+        <p className="section__sub">เก็บภาพ {MAX_SUSPECTS} รอบล่าสุด</p>
+      </div>
+      <p className="facts quiet" style={{ marginBottom: 4 }}>
+        รอบที่ค่าต่างจากรอบก่อนเกินกว่าน้ำจะขึ้นลงได้ (ระบบพักค่าไว้ ไม่บันทึกและไม่เตือน จนกว่ารอบถัดไปจะยืนยัน)
+        หรือรอบที่อ่านได้ไม่มั่นใจ ดูภาพเพื่อหาว่าอะไรบังไม้วัด
+      </p>
+      {suspects.length === 0 ? (
+        <p className="facts quiet">ยังไม่มีรอบที่น่าสงสัย</p>
+      ) : (
+        <ul className="log suspects">
+          {suspects.map((s, i) => (
+            <li key={s.t}>
+              <span className="what num">
+                {s.reason === "jump"
+                  ? `พักไว้ · อ่านได้ ${metres(s)}${s.lastLevel !== null ? ` จากค่าก่อนหน้า ${s.lastLevel.toFixed(2)} ม.` : ""}`
+                  : `ไม่มั่นใจ · อ่านได้ ${metres(s)}${s.reason ? ` · ${REASON_LABEL[s.reason] ?? s.reason}` : ""}`}
+              </span>
+              <span className="when num">
+                {formatDateTime(s.t)}
+                {s.y !== null && ` · แถว ${s.y}`}
+              </span>
+              <button type="button" className="btn btn--quiet" aria-expanded={open?.t === s.t} onClick={() => show(s, i)}>
+                {open?.t === s.t ? "ซ่อนภาพ" : "ดูภาพ"}
+              </button>
+              {open?.t === s.t && (
+                <div className="camera" style={{ maxWidth: 800 }}>
+                  {open.url ? (
+                    <>
+                      {/* eslint-disable-next-line @next/next/no-img-element -- object URL of an admin-only picture */}
+                      <img src={open.url} alt={`ภาพรอบ ${formatDateTime(s.t)}`} width={800} height={600} />
+                      {s.y !== null && (
+                        <div className="camera__line" style={{ top: `${(s.y / 600) * 100}%` }}>
+                          <span>ระบบเห็นผิวน้ำที่แถว {s.y}</span>
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <div className="camera__empty" role={open.error ? "alert" : "status"}>
+                      {open.error ?? "กำลังโหลดภาพ…"}
+                    </div>
+                  )}
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
 function AdminDevice({ password }: { password: string }) {
   const [phase, setPhase] = useState<DevicePhase>("checking");
   const [note, setNote] = useState<Msg>(null);

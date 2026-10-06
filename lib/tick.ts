@@ -3,12 +3,14 @@ import { INITIAL_TRACKING, MAX_REFS, decideTracking, type TrackingDecision } fro
 import { captureFrames, type Capture } from "./capture";
 import { getConfig, type SiteConfig } from "./config";
 import { DARK_LUMA, frameMeanLuma, readGauge } from "./gauge";
+import { judgeJump, type LevelAt } from "./jump";
 import { KEYS, kv } from "./kv";
 import { alertMessage, digestMessage, systemMessage, type PushMessage, type SystemNotice } from "./messages";
 import { mapLimit, sendPush } from "./push";
 import { isDigestDue } from "./schedule";
 import {
   addReading,
+  addSuspect,
   allSubscribers,
   applyRoundUpdates,
   getGaugeRefs,
@@ -20,6 +22,7 @@ import {
   setGaugeRefs,
   setSnapshot,
   setState,
+  type LastRead,
   type RoundUpdate,
   type SiteState,
   type Subscriber,
@@ -73,21 +76,37 @@ export async function runTick(origin: string, now = Date.now(), deps: TickDeps =
       notices.push(...decision.notices);
       state = { ...state, tracking: decision.state };
       const estimate: Estimate | undefined = r.belowRange ? "below" : r.approx ? "approx" : undefined;
-      readingInfo = { level: r.level, confidence: r.confidence, reason: r.reason, y: r.y, estimate };
-      await setSnapshot({ t: cap.capturedAt, jpegBase64: cap.jpeg.toString("base64"), ...(r.ok ? { y: r.y, estimate } : { y: null }) });
+      const read: LevelAt | null = r.ok && r.level !== null ? { t: cap.capturedAt, level: r.level, calibration: config.calibration } : null;
+      const held = read !== null && judgeJump(read, state.lastGood, state.held) === "hold";
+      readingInfo = { level: r.level, confidence: r.confidence, reason: held ? "jump" : r.reason, y: r.y, estimate };
+      const jpegBase64 = cap.jpeg.toString("base64");
+      // A held round draws no waterline: the number on the page is still the last accepted one.
+      await setSnapshot({ t: cap.capturedAt, jpegBase64, ...(read && !held ? { y: r.y, estimate } : { y: null }) });
+      // Keep the picture of a round worth a second look, so the admin can see what crossed the gauge.
+      if (read && (held || r.confidence === "low")) {
+        const suspect = { t: read.t, level: read.level, y: r.y, confidence: r.confidence, reason: held ? "jump" : r.reason };
+        await addSuspect({ ...suspect, ...(estimate && { estimate }), lastLevel: state.lastGood?.level ?? null }, jpegBase64);
+      }
 
-      if (r.ok && r.level !== null) {
-        reading = { t: cap.capturedAt, level: r.level, confidence: r.confidence };
+      if (read && held) {
+        state = {
+          ...failed(state, now, "jump", { level: read.level, confidence: r.confidence, y: r.y, estimate }),
+          held: read,
+        };
+      } else if (read) {
+        reading = { t: read.t, level: read.level, confidence: r.confidence };
         await addReading({ ...reading, y: r.y ?? undefined, ...(estimate && { estimate }) });
         const stepped = stepAlert(state.alert, reading, config.thresholds);
         events = stepped.events;
         state = {
           ...state,
           alert: stepped.state,
-          lastRead: { t: cap.capturedAt, ok: true, level: r.level, confidence: r.confidence, reason: r.reason, y: r.y, estimate },
+          lastRead: { t: cap.capturedAt, ok: true, level: read.level, confidence: r.confidence, reason: r.reason, y: r.y, estimate },
           lastSuccessAt: cap.capturedAt,
           failingSince: null,
           failureStreak: 0,
+          lastGood: read,
+          held: null,
         };
         if (events.length) await logEvents(events);
       } else {
@@ -156,10 +175,11 @@ async function readTracked(cap: Capture, config: SiteConfig, state: SiteState, n
   return decision;
 }
 
-function failed(state: SiteState, now: number, reason: string): SiteState {
+/** `read` keeps what the reader saw when the level was refused rather than unreadable. */
+function failed(state: SiteState, now: number, reason: string, read: Omit<LastRead, "t" | "ok" | "reason"> = {}): SiteState {
   return {
     ...state,
-    lastRead: { t: now, ok: false, reason },
+    lastRead: { t: now, ok: false, reason, ...read },
     failingSince: state.failingSince ?? now,
     failureStreak: state.failureStreak + 1,
   };

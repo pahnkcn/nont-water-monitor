@@ -2,6 +2,7 @@ import { execFileSync } from "node:child_process";
 import path from "node:path";
 import ffmpegPath from "ffmpeg-static";
 import type { RGBFrame } from "@/lib/gauge";
+import { DEFAULT_GAUGE_CONFIG } from "@/lib/gauge-config";
 
 export const FIXTURES = path.join(__dirname, "fixtures");
 
@@ -69,4 +70,29 @@ export function movedPoint(
   const { dx = 0, dy = 0, scale = 1 } = move;
   const c = move.about ?? { x: frame.width / 2, y: frame.height / 2 };
   return { x: c.x + scale * (p.x - c.x) + dx, y: c.y + scale * (p.y - c.y) + dy };
+}
+
+/** Plain frame: grey wall, white gauge strip with dark bars down to `waterY`, brown water below. */
+export function syntheticFrame(waterY: number, opts: { pipeAt?: number; dark?: boolean } = {}): RGBFrame {
+  const width = 800;
+  const height = 600;
+  const data = new Uint8Array(width * height * 3);
+  const cfg = DEFAULT_GAUGE_CONFIG;
+  const slope = (cfg.axis.bottom.x - cfg.axis.top.x) / (cfg.axis.bottom.y - cfg.axis.top.y);
+  for (let y = 0; y < height; y++) {
+    const cx = cfg.axis.top.x + (y - cfg.axis.top.y) * slope;
+    for (let x = 0; x < width; x++) {
+      let rgb: [number, number, number] = [120, 120, 115];
+      const onGauge = Math.abs(x - cx) <= 16;
+      if (y >= waterY) rgb = [118, 96, 60];
+      else if (onGauge) rgb = y % 10 < 2 && x > cx ? [30, 30, 60] : [235, 235, 232];
+      if (opts.pipeAt !== undefined && y >= opts.pipeAt && y < opts.pipeAt + 10) rgb = [40, 120, 220];
+      if (opts.dark) rgb = [6, 6, 6];
+      const i = (y * width + x) * 3;
+      data[i] = rgb[0];
+      data[i + 1] = rgb[1];
+      data[i + 2] = rgb[2];
+    }
+  }
+  return { width, height, data };
 }
