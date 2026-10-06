@@ -220,27 +220,19 @@ export function LevelChart({ day, watch, danger, now, provisional }: Props) {
                   {tickLabel(t, range)}
                 </text>
               ))}
-              <defs>
-                {geo.rails.map((r) => (
-                  <pattern key={r.key} id={`${titleId}-${r.key}`} width="8" height="8" patternUnits="userSpaceOnUse">
-                    <rect x="0.8" y="0.8" width="6.4" height="6.4" fill="none" stroke={r.color} strokeWidth="1.3" />
-                    <path d="M1.8 1.8 6.2 6.2M6.2 1.8 1.8 6.2" stroke={r.color} strokeWidth="1.1" />
-                  </pattern>
-                ))}
-              </defs>
+              {/* the same plain 2px rail as on the gauge */}
               {geo.rails.map((r) => (
-                <g key={r.key}>
-                  {/* the same balustrade rail as on the louvre gauge */}
-                  <rect className="rail-band" x={PAD.left} width={width - PAD.left - PAD.right} y={geo.y(r.value) - 4} height="8" fill={`url(#${titleId}-${r.key})`} />
-                  <line x1={PAD.left} x2={width - PAD.right} y1={geo.y(r.value) - 4} y2={geo.y(r.value) - 4} stroke={r.color} strokeWidth="1.5" />
-                  <text x={PAD.left + 6} y={geo.y(r.value) - 9} className="axis-text" style={{ fill: "var(--ink)", fontWeight: 600 }}>
-                    {r.label}
-                    {provisional ? "*" : ""}
-                  </text>
-                </g>
+                <line key={r.key} x1={PAD.left} x2={width - PAD.right} y1={geo.y(r.value)} y2={geo.y(r.value)} stroke={r.color} strokeWidth="2" />
               ))}
               <path className="area" d={geo.area} />
               <path className="line" d={geo.line} />
+              {/* rail names paint over the line so their knockout keeps them legible */}
+              {geo.rails.map((r) => (
+                <text key={r.key} x={PAD.left + 6} y={geo.y(r.value) - 6} className="axis-text rail-name">
+                  {r.label}
+                  {provisional ? "*" : ""}
+                </text>
+              ))}
               {geo.singles.map((p) => (
                 <circle key={p[0]} className="dot" cx={geo.x(p[0])} cy={geo.y(p[1])} r="4" />
               ))}

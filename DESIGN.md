@@ -13,9 +13,6 @@ colors:
   watch: "#b65a2c"
   danger: "#a3201a"
   gilt: "#c9a227"
-  stile: "#1e2b2a"
-  interior: "#2c3836"
-  blade-wet: "#7a6235"
   action-bg: "#1e2b2a"
   action-fg: "#f1f2ee"
   head-normal: "#22302f"
@@ -31,9 +28,6 @@ colors:
   night-watch: "#e08a55"
   night-danger: "#f0645b"
   night-gilt: "#d9b649"
-  night-stile: "#3c4a47"
-  night-interior: "#070b0a"
-  night-blade-wet: "#8a7140"
   night-action-bg: "#2a2416"
   night-action-fg: "#f0d98a"
   night-head-normal: "#0b1110"
@@ -168,7 +162,7 @@ components:
 
 **Creative North Star: "Old Hall Veranda"**
 
-You read the river level through the louvred awnings of the 1910 Nonthaburi provincial hall, which faces the water at the pier. One blade equals 10 cm, the same step as the marks on the staff gauge. Above the water the blades stand open on a dark interior. Below it they are shut and silted. The watch and danger thresholds cross the shutter as brick-orange and red balustrade rails. Everything else on the surface comes from the same building: whitewashed ground, eave-shadow ink, Chao Phraya silt for water, the gilt of the signboard for the wordmark.
+You read the river level through the louvred awnings of the 1910 Nonthaburi provincial hall, which faces the water at the pier. The staff gauge itself is drawn like a dimension on the hall's survey drawing: one ruler marked every 10 cm, a silt column for the water, and a dimension line from the waterline to the next threshold that carries the same centimetres as the big numeral. The watch and danger thresholds cross it as brick-orange and red rails. Everything else on the surface comes from the same building: whitewashed ground, eave-shadow ink, Chao Phraya silt for water, the gilt of the signboard for the wordmark.
 
 The system is flat and typographic. Hierarchy comes from scale: one very large tabular numeral, then plain Thai text at near-body sizes. Structure comes from 2px ink rules and hairline slat-edge rules, not from containers. The state of the river owns the whole header band. Night is a separate palette built for reading at 2 a.m., not an inversion of the day palette. It has its own deep-silt action colour, so no light slab ever appears in the dark.
 
@@ -177,7 +171,7 @@ The build has no cards, no drop shadows and no gradients. Status is never shown 
 **Key Characteristics:**
 - A full-strength state colour fills the sticky header band. The wordmark sits left and the state word with its shape icon sits right.
 - A giant tabular numeral is sized by its own column (container query).
-- The louvre gauge is the signature instrument. Its geometry (rails, silt fill, waterline) repeats in the chart.
+- The dimension-line gauge is the signature instrument. It restates the numeral as a measured distance, so the drawing and the number can never disagree.
 - Choices are built as slats: segmented tabs and stacked option rows where the chosen slat closes dark.
 - Every corner is square (2px). Rules are 1px hairlines, 1.5px control strokes and 2px section rules.
 - Light and night are two separate palettes. The night palette is applied by `[data-theme="dark"]` or by `prefers-color-scheme` unless the user has chosen light.
@@ -188,7 +182,7 @@ The palette is architectural and muted: lime-wash greys, eave charcoal and river
 
 ### Primary
 - **Eave Shadow Ink** (ink): text, 2px section rules, control strokes, focus outlines, chart tooltip, the waterline and the reading flag. In light mode it is also the action fill (action-bg).
-- **Chao Phraya Silt** (river): water. It fills the louvre below the waterline, draws the chart line and area (river-soft), marks chart dots and selection, and is the inset underline on primary-button hover. It also outlines focus inside slats and choice rows.
+- **Chao Phraya Silt** (river): water. It fills the gauge's water column, draws the chart line and area (river-soft), marks chart dots and selection, and is the inset underline on primary-button hover. It also outlines focus inside slats and choice rows.
 
 ### Secondary
 - **Balustrade Brick** (watch): watch state. It is the header band at watch (head-watch), the watch rail, the watch icon and the warning-notice border. On ground it measures 3.72:1, so in light mode it is used only for graphics and borders, never for body text.
@@ -199,11 +193,10 @@ The palette is architectural and muted: lime-wash greys, eave charcoal and river
 
 ### Neutral
 - **Whitewashed Louvre** (ground): page background, and the cut colour inside the danger octagon in the alert log.
-- **Lit Slat** (slat): open blade faces, and the hover fill on outline buttons, slats and choice rows.
+- **Lit Slat** (slat): the hover fill on outline buttons, slats and choice rows.
 - **Slat Shadow** (slat-edge): hairline rules for table rows, log rows, chart grid and choice separators. It also strokes the dashed empty-state border and the default notice border.
 - **Secondary Ink** (ink-2): metadata, units, axis labels and quiet lines (6.0:1 on ground).
-- **Shutter Frame / Dark Room / Wet Blade** (stile, interior, blade-wet): reserved for the louvre gauge.
-- **Night set** (night-*): deep green-black ground, mid-grey slats and a nearly black interior. State colours are lifted (night-watch 6.7:1 and night-danger 5.6:1 on night ground). The header bands go darker (night-head-*) and the action is deep silt (night-action-bg) with pale gilt text, outlined in night-gilt.
+- **Night set** (night-*): deep green-black ground and mid-grey slats. State colours are lifted (night-watch 6.7:1 and night-danger 5.6:1 on night ground). The header bands go darker (night-head-*) and the action is deep silt (night-action-bg) with pale gilt text, outlined in night-gilt.
 
 ### Named Rules
 **The State Owns the Band Rule.** The sticky header is filled edge to edge with the current state colour: charcoal, then brick, then red. The background change takes 400ms ease-out-expo. The state word always carries its shape icon.
@@ -228,7 +221,7 @@ The palette is architectural and muted: lime-wash greys, eave charcoal and river
 - **Title** (700, 1.25rem, 1.25): section titles, each sitting above a 2px ink rule.
 - **Body** (400, 1rem, 1.6): running text. Prose caps at 68ch.
 - **Label** (600, 0.9375rem): the reading label, facts list, slats, notices and section subtitles (the subtitles in ink-2 at 400).
-- **Small** (0.875rem): log timestamps, legends, choice descriptions. Chart axis text is 11px and louvre ticks are 14px.
+- **Small** (0.875rem): log timestamps, legends, choice descriptions. Chart axis text is 11px; gauge rail names are 13px and its dimension value 20px (in a 212-unit viewBox that scales with the column).
 
 ### Named Rules
 **The One Big Number Rule.** Hierarchy comes from scale alone. The numeral is the only display-size text. Everything else stays between 0.8125rem and 1.75rem.
@@ -239,21 +232,21 @@ The palette is architectural and muted: lime-wash greys, eave charcoal and river
 
 There is one 1200px column with a gutter of 16px, which widens to 24px from 600px and respects safe-area insets. Spacing follows a 4px base scale (4, 8, 12, 16, 24, 32, 48, 64).
 
-- **Lead:** two columns even on a 390px phone (1.1fr / 1fr, a 16px gap). The reading is on the left and the louvre on the right. The full-width primary action sits below. From 640px the louvre column is fixed at 220px with a 32px gap.
+- **Lead:** two columns even on a 390px phone (1.1fr / 1fr, a 16px gap). The reading is on the left and the gauge on the right. The full-width primary action sits below. From 640px the gauge column is fixed at 220px with a 32px gap.
 - **Desktop (1024px+):** the page splits into two equal columns with a 64px gap. The lead becomes sticky under the header at 200px. The sections (chart, camera, notifications, alert log) stack on the right with 32px to 48px between them.
 - The header is 56px tall and sticky. Scroll padding clears it.
 - Density is calm. Sections are separated by space and a 2px rule, not by panels.
 
 ## Elevation & Depth
 
-The system is flat. Nothing floats on a drop shadow. Order comes from rules, from the state band and from ink-filled selected surfaces. The only depth is inside the louvre, where it is part of the material: open blades sit over a dark interior with a 1.5px black-alpha shadow line under each blade, and shut blades show a 2px black-alpha overlap seam. The hover state of the primary button uses an inset 3px river underline (`inset 0 -3px 0 var(--river)`). That underline is a rule, not an elevation.
+The system is flat. Nothing floats on a drop shadow. Order comes from rules, from the state band and from ink-filled selected surfaces. The hover state of the primary button uses an inset 3px river underline (`inset 0 -3px 0 var(--river)`). That underline is a rule, not an elevation.
 
 ### Named Rules
-**The Flat Veranda Rule.** No drop shadows, no gradients, no cards. Depth is allowed only inside the louvre gauge, where it describes the shutter.
+**The Flat Veranda Rule.** No drop shadows, no gradients, no cards, and no depth anywhere, the gauge included.
 
 ## Shapes
 
-Every control, the select and the tooltip have square 2px corners. Strokes form a ladder: 1px hairlines (slat-edge) for rows and grid, 1.5px ink for control outlines and notices, and 2px ink for section heads and the footer top rule. Empty states use a 1.5px dashed slat-edge border. The cross-in-square balustrade pattern belongs to threshold rails only: 10px tiles in the louvre, 8px tiles in the chart, each with a solid top line in the rail's colour. The reading flag is a pointed tag in ink.
+Every control, the select and the tooltip have square 2px corners. Strokes form a ladder: 1px hairlines (slat-edge) for rows and grid, 1.5px ink for control outlines and notices, and 2px ink for section heads and the footer top rule. Empty states use a 1.5px dashed slat-edge border. Threshold rails are plain 2px lines in the rail's colour, the same on the gauge and the chart, with the rail name in ink on a ground-coloured knockout. Dimension terminators are 45° slashes, 1.5px ink.
 
 ## Components
 
@@ -280,16 +273,16 @@ These are bordered statements, not cards. Padding is 12px, the border is 1.5px s
 ### Navigation
 The header band is the whole of navigation: the gilt Taviraj wordmark links home, with the state word and its icon (or a back link on plain pages) opposite. The footer is in ink-2 under a 2px ink rule, with source credit, the about link and the night-mode toggle (an outline button with a moon icon and `aria-pressed`).
 
-### Louvre Gauge (signature)
-This is an SVG shutter. One blade is a 14px pitch and equals 10 cm. The range runs from 30 cm below the lower of the level and 1.0 m, up to at least 3.0 m.
-- **Above water:** open blades with a 6px lit face (slat) and a 1.5px shadow line, over a dark interior, all inside a stile frame.
-- **Below water:** silt fills the interior. Each blade is shut (blade-wet) with a 2px overlap seam.
-- **Motion:** each shut blade swings closed in two steps (180ms, `steps(2, end)`, scaleY 0.43 to 1). The bottom blade goes first, then the next 70ms later. Reduced motion turns this off.
-- **Rails:** watch and danger cross the frame as 10px cross-in-square balustrade rails, each with a 2px top line in the rail colour. Each rail's name is set at 13px/700 to its left, level with the rail; no metre values. If the rails crowd within 20px, danger's label lifts above its rail and watch's label drops below. If they would overlap, the watch rail thins to a 3px line so danger stays whole. Provisional thresholds get an asterisk and a footnote.
-- **Reading:** a 2px ink waterline runs out to a pointed ink flag that says ตอนนี้ in on-ink. There is no metre scale; a caption under the gauge says each blade is 10 cm.
+### Dimension Gauge (signature, `components/Louvre.tsx`)
+An SVG survey drawing. 10 cm is a 14px pitch. The range runs from 30 cm below the lower of the level and 1.0 m, up to at least 3.0 m.
+- **Ruler:** a 32px water column outlined in a 35% ink-2 hairline, with a 1.5px ink rule on its right edge. Ticks run right of the rule every 10 cm (5px); every fifth is 10px. No numbers: metres stay admin-only.
+- **Water:** solid river silt from the waterline to the base of the column.
+- **Rails:** watch and danger cross the label column and the ruler as plain 2px lines in the rail colour. Each rail's name is set at 13px/700 to its left with a ground-coloured knockout stroke. If the rails crowd within 20px, danger's label lifts above its rail and watch's label drops below; if they nearly touch, the watch line thins to 1px. Provisional thresholds get an asterisk and a footnote.
+- **Reading:** a 2px ink waterline runs right to a 2.5px ink origin dot. From there a 1px ink dimension line runs to the next threshold (or down to danger once over it), with 45° slash terminators at both ends and a 1px extension of the target rail. Beside it sits the gap from `thresholdGap()`, 20px/700 tabular with ซม. at 13px/600: `+` when over danger, `>` when the water is below the readable range, `≈` when approximate. No dimension when there is no reading or the water sits exactly on danger. The caption under the gauge says each mark is 10 cm.
+- **Motion:** once on mount the water column rises (scaleY 0 to 1, 700ms, cubic-bezier(0.16, 1, 0.3, 1)), then the waterline and dimension fade in (300ms). Reduced motion turns both off.
 
 ### Level Chart
-The chart repeats the gauge's geometry. A 2px river line runs over a river-soft area fill with 4px river dots ringed in ground. Threshold rails are drawn as 8px balustrade bands, the grid uses slat-edge hairlines, and the scrub tooltip is ink. Below the chart are a rail legend and a disclosure table of readings with hairline rows.
+A 2px river line runs over a river-soft area fill with 4px river dots ringed in ground. Threshold rails are the gauge's plain 2px lines at the exact threshold, named just above the line at 11px/600 in ink with a ground knockout. The grid uses slat-edge hairlines, and the scrub tooltip is ink. Below the chart are a rail legend and a disclosure table of readings with hairline rows.
 
 ### Camera Snapshot
 The latest snapshot carries three 2px dashed lines across the photo: the waterline in fixed yellow (#ffd84d), and the watch and danger levels in the night state colours (night-watch, night-danger) whatever the theme, since the photo does not change with it. Each line has a label on a 72% black tag: the waterline's at the left, the rails' at the right with their triangle or octagon icon and the name only, no metre values. Danger's tag sits above its line and watch's below; near an edge a tag is pushed back inside the photo, and watch's never climbs over danger's. Tags paint over every line. Provisional thresholds get an asterisk. Rails are drawn only on the snapshot, where the camera position is known, never on the live video, and not at all while the gauge is lost.
@@ -302,13 +295,14 @@ Each row is a hairline-ruled grid of the state icon in its state colour, what ha
 ### Do:
 - **Do** fill the whole header band with the current state colour and pair the state word with its circle, triangle or octagon icon.
 - **Do** size the level numeral from its column with `clamp(4.5rem, 50cqi, 10rem)` and tabular lining figures.
-- **Do** draw thresholds as cross-in-square balustrade rails with a text label and value, and add an asterisk while they are provisional.
+- **Do** draw every threshold as a plain 2px rail in its state colour, labelled with its name, with an asterisk while it is provisional. Gauge and chart use the same rail.
 - **Do** build choices as slats: a 1.5px ink frame, ink dividers, and the chosen slat filled with the action tokens.
 - **Do** use the action tokens (not ink) for any selected or primary fill, so night mode stays deep silt with gilt.
 - **Do** keep corners at 2px and separate sections with a 2px ink rule and white space.
 
 ### Don't:
-- **Don't** use cards, drop shadows or gradients. Depth belongs only to the louvre's blades.
+- **Don't** use cards, drop shadows, gradients or depth anywhere.
+- **Don't** compute the gauge's dimension separately from the numeral. Both come from `thresholdGap()`.
 - **Don't** let colour carry status alone. Every state needs its shape or its word.
 - **Don't** use gilt outside the wordmark and the night action, and don't set Taviraj anywhere but the wordmark.
 - **Don't** delete alert-log entries. Strike them through when the water falls.

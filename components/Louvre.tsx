@@ -1,12 +1,10 @@
-import { useId } from "react";
-import { cmBetween, formatGap } from "@/lib/format";
+import { cmBetween, formatGap, thresholdGap } from "@/lib/format";
 import type { Estimate } from "@/lib/summary";
 
-// The signature gauge: a louvred shutter like the awnings of the old provincial hall.
-// One blade is 10 cm on the staff gauge. Above the water the blades stand open, with the
-// dark interior showing between them; below it each blade is shut and stained with silt.
-// The watch and danger thresholds cross the shutter as balustrade rails.
-// No metre values are drawn: the gauge's meter digit is unknown, so only blades are counted.
+// The signature gauge, drawn like a dimension on a survey drawing: one ruler marked every
+// 10 cm, a silt column for the water, and a dimension line from the waterline to the next
+// threshold carrying the same centimetres as the big numeral beside it.
+// No metre values are drawn: the gauge's meter digit is unknown, so only marks are counted.
 
 type Props = {
   level: number | null;
@@ -18,14 +16,16 @@ type Props = {
   provisional?: boolean;
 };
 
-const SLAT = 14; // px per 10 cm
-const OPEN_BLADE = 6; // visible blade face when open; the rest of the pitch is gap
+const PITCH = 14; // px per 10 cm
 const TOP_PAD = 12;
 const W = 212;
-const FRAME_X = 64;
-const FRAME_W = 92;
-const STILE = 6;
-const RAIL_H = 10;
+const LABEL_X = 56; // rail names end here
+const COL_X = 64;
+const COL_W = 32;
+const RULE_X = COL_X + COL_W;
+const RAIL_END = 108;
+const DIM_X = 132;
+const TERM = 4; // half-length of a 45° dimension terminator
 
 export function louvreRange(level: number | null, danger: number) {
   const top = Math.max(3.0, Math.ceil((danger + 0.3) * 10) / 10);
@@ -35,15 +35,13 @@ export function louvreRange(level: number | null, danger: number) {
 }
 
 export function Louvre({ level, estimate, watch, danger, provisional }: Props) {
-  const uid = useId().replace(/:/g, "");
   const { bottom, top } = louvreRange(level, danger);
-  const slats = Math.round((top - bottom) * 10);
+  const steps = Math.round((top - bottom) * 10);
   const innerTop = TOP_PAD;
-  const innerH = slats * SLAT;
-  const H = innerTop + innerH + TOP_PAD;
+  const innerH = steps * PITCH;
+  const base = innerTop + innerH;
+  const H = base + TOP_PAD;
   const y = (m: number) => innerTop + ((top - m) / (top - bottom)) * innerH;
-  const innerX = FRAME_X + STILE;
-  const innerW = FRAME_W - STILE * 2;
   const mark = provisional ? "*" : "";
 
   const clamped = level === null ? null : Math.min(top, Math.max(bottom, level));
@@ -54,49 +52,37 @@ export function Louvre({ level, estimate, watch, danger, provisional }: Props) {
     { key: "danger", label: "อันตราย", value: danger, color: "var(--danger)" },
   ].filter((r) => r.value > bottom && r.value < top); // danger listed last so it paints on top
 
+  // The dimension measures the same gap as the numeral, so it can never disagree with it.
+  const gap = level === null ? null : thresholdGap(level, { watch, danger }, estimate);
+  const target = gap ? (gap.target === "watch" ? watch : danger) : null;
+  const dim =
+    gap && gap.cm > 0 && waterY !== null && target !== null && target > bottom && target < top
+      ? {
+          a: Math.min(y(target), waterY),
+          b: Math.max(y(target), waterY),
+          railY: y(target),
+          color: gap.target === "watch" ? "var(--watch)" : "var(--danger)",
+          prefix: gap.over ? "+" : gap.estimate === "below" ? ">" : gap.estimate === "approx" ? "≈" : "",
+        }
+      : null;
+
   const description =
     (level === null ? "ไม้วัดจำลอง ยังไม่มีค่าระดับน้ำ" : `ไม้วัดจำลอง ${formatGap(level, { watch, danger }, estimate)}`) +
-    ` ระดับอันตรายสูงกว่าระดับเฝ้าระวัง ${cmBetween(danger, watch)} ซม. ช่องละ 10 ซม.` +
+    ` ระดับอันตรายสูงกว่าระดับเฝ้าระวัง ${cmBetween(danger, watch)} ซม. ขีดละ 10 ซม.` +
     (provisional ? " เกณฑ์ยังเป็นค่าชั่วคราว" : "");
 
   return (
     <svg className="louvre" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={description}>
-      <defs>
-        {rails.map((r) => (
-          <pattern key={r.key} id={`${uid}-${r.key}`} width={RAIL_H} height={RAIL_H} patternUnits="userSpaceOnUse">
-            <rect x="0" y="0" width={RAIL_H} height={RAIL_H} fill="var(--ground)" />
-            <rect x="1" y="1" width={RAIL_H - 2} height={RAIL_H - 2} fill="none" stroke={r.color} strokeWidth="1.6" />
-            <path d={`M2.2 2.2 ${RAIL_H - 2.2} ${RAIL_H - 2.2}M${RAIL_H - 2.2} 2.2 2.2 ${RAIL_H - 2.2}`} stroke={r.color} strokeWidth="1.4" />
-          </pattern>
-        ))}
-      </defs>
-
-      {/* frame and the dark interior seen through open blades */}
-      <rect className="stile" x={FRAME_X} y={innerTop - STILE} width={FRAME_W} height={innerH + STILE * 2} />
-      <rect className="interior" x={innerX} y={innerTop} width={innerW} height={innerH} />
-      {waterY !== null && (
-        <rect className="water" x={innerX} y={waterY} width={innerW} height={innerTop + innerH - waterY} />
-      )}
-
-      {Array.from({ length: slats }, (_, i) => {
-        const sy = innerTop + i * SLAT;
-        const shut = waterY !== null && sy >= waterY - 1;
-        if (shut) {
-          const order = slats - 1 - i; // the bottom blade shuts first
-          return (
-            <g key={i} className="blade-shut" style={{ animationDelay: `${order * 70}ms` }}>
-              <rect className="blade-wet" x={innerX} y={sy} width={innerW} height={SLAT} />
-              <rect className="blade-overlap" x={innerX} y={sy} width={innerW} height={2} />
-            </g>
-          );
-        }
-        return (
-          <g key={i}>
-            <rect className="slat" x={innerX} y={sy + 1} width={innerW} height={OPEN_BLADE} />
-            <rect className="slat-edge" x={innerX} y={sy + 1 + OPEN_BLADE} width={innerW} height={1.5} />
-          </g>
-        );
+      {/* water column and ruler */}
+      <rect className="column" x={COL_X + 0.5} y={innerTop + 0.5} width={COL_W - 1} height={innerH - 1} />
+      {waterY !== null && <rect className="water" x={COL_X} y={waterY} width={COL_W} height={base - waterY} />}
+      {Array.from({ length: steps + 1 }, (_, i) => {
+        const ty = innerTop + i * PITCH;
+        // Every fifth mark is longer, counted on the gauge's own 10 cm steps.
+        const long = Math.round(top * 10 - i) % 5 === 0;
+        return <line key={i} className="tick" x1={RULE_X} x2={RULE_X + (long ? 10 : 5)} y1={ty} y2={ty} />;
       })}
+      <line className="rule" x1={RULE_X} x2={RULE_X} y1={innerTop} y2={base} />
 
       {/* threshold rails */}
       {rails.map((r) => {
@@ -104,22 +90,12 @@ export function Louvre({ level, estimate, watch, danger, provisional }: Props) {
         // Labels sit level with their rail; when the rails crowd, danger's lifts above and watch's drops below.
         const crowded = rails.length === 2 && Math.abs(y(watch) - y(danger)) < 20;
         const nameY = crowded ? (r.key === "danger" ? ry - 8 : ry + 17) : ry + 4.5;
-        // When the two rails would overlap, the lower (watch) rail thins to a line so danger stays whole.
-        const thin = r.key === "watch" && Math.abs(y(watch) - y(danger)) < RAIL_H + 3;
-        // Rails stop at the frame's right edge so they never run into the reading flag.
-        const x1 = FRAME_X - 4;
-        const x2 = FRAME_X + FRAME_W;
+        // When the two rails would overlap, the lower (watch) rail thins so danger stays whole.
+        const thin = r.key === "watch" && Math.abs(y(watch) - y(danger)) < 5;
         return (
           <g key={r.key}>
-            {thin ? (
-              <line x1={x1} x2={x2} y1={ry} y2={ry} stroke={r.color} strokeWidth="3" />
-            ) : (
-              <>
-                <rect x={x1} y={ry - RAIL_H / 2} width={x2 - x1} height={RAIL_H} fill={`url(#${uid}-${r.key})`} />
-                <line x1={x1} x2={x2} y1={ry - RAIL_H / 2} y2={ry - RAIL_H / 2} stroke={r.color} strokeWidth="2" />
-              </>
-            )}
-            <text className="rail-label" x={FRAME_X - 7} y={nameY} textAnchor="end" fill="currentColor">
+            <line x1={LABEL_X + 4} x2={RAIL_END} y1={ry} y2={ry} stroke={r.color} strokeWidth={thin ? 1 : 2} />
+            <text className="rail-label" x={LABEL_X} y={nameY} textAnchor="end" fill="currentColor">
               {r.label}
               {mark}
             </text>
@@ -127,18 +103,30 @@ export function Louvre({ level, estimate, watch, danger, provisional }: Props) {
         );
       })}
 
-      {/* the reading */}
-      {waterY !== null && level !== null && (
-        <g>
-          <line className="waterline" x1={innerX} x2={FRAME_X + FRAME_W + 4} y1={waterY} y2={waterY} />
-          <path
-            className="marker"
-            d={`M${FRAME_X + FRAME_W + 4} ${waterY} l6 -11 h${W - FRAME_X - FRAME_W - 10} v22 h-${W - FRAME_X - FRAME_W - 10} z`}
-          />
-          <text className="marker-text" x={FRAME_X + FRAME_W + 12} y={waterY + 5}>
-            {/* "ประมาณ" overflows the flag; the reading and its notice already say it is an estimate. */}
-            {estimate === "below" ? "ต่ำกว่า" : "ตอนนี้"}
-          </text>
+      {/* the reading: waterline and the dimension to the next threshold */}
+      {waterY !== null && (
+        <g className="reading">
+          <line className="waterline" x1={COL_X} x2={DIM_X} y1={waterY} y2={waterY} />
+          <circle className="origin" cx={DIM_X} cy={waterY} r={2.5} />
+          {dim && gap && (
+            <>
+              <line x1={RAIL_END} x2={DIM_X + 5} y1={dim.railY} y2={dim.railY} stroke={dim.color} strokeWidth={1} />
+              <line className="dim" x1={DIM_X} x2={DIM_X} y1={dim.a} y2={dim.b} />
+              <path
+                className="dim-end"
+                d={`M${DIM_X - TERM} ${dim.a + TERM} l${TERM * 2} ${-TERM * 2} M${DIM_X - TERM} ${dim.b + TERM} l${TERM * 2} ${-TERM * 2}`}
+              />
+              <text
+                className="dim-value"
+                x={DIM_X + 7}
+                y={Math.min(H - 4, Math.max(innerTop + 14, (dim.a + dim.b) / 2 + 7))}
+              >
+                {dim.prefix}
+                {gap.cm}
+                <tspan className="dim-unit"> ซม.</tspan>
+              </text>
+            </>
+          )}
         </g>
       )}
     </svg>

@@ -16,9 +16,6 @@
   --danger: #a3201a;
   --gilt: #c9a227;        /* signboard lettering, only on the dark header */
   --on-ink: #f1f2ee;
-  --stile: #1e2b2a;       /* shutter frame */
-  --interior: #2c3836;    /* dark room seen between open blades */
-  --blade-wet: #7a6235;   /* a blade shut under the water */
   --action-bg: #1e2b2a;
   --action-fg: #f1f2ee;
   --action-line: #1e2b2a;
@@ -56,9 +53,6 @@
   --danger: #f0645b;
   --gilt: #d9b649;
   --on-ink: #121a19;
-  --stile: #3c4a47;
-  --interior: #070b0a;
-  --blade-wet: #8a7140;
   --action-bg: #2a2416; /* deep silt, never a light slab at night */
   --action-fg: #f0d98a;
   --action-line: #d9b649;
@@ -82,9 +76,6 @@
     --danger: #f0645b;
     --gilt: #d9b649;
     --on-ink: #121a19;
-    --stile: #3c4a47;
-    --interior: #070b0a;
-    --blade-wet: #8a7140;
     --action-bg: #2a2416; /* deep silt, never a light slab at night */
     --action-fg: #f0d98a;
     --action-line: #d9b649;
@@ -419,7 +410,7 @@ select {
   border-color: var(--danger);
 }
 
-/* ---------- louvre gauge ---------- */
+/* ---------- staff gauge (ไม้วัดจำลอง) ---------- */
 
 .louvre {
   display: block;
@@ -428,43 +419,32 @@ select {
   overflow: visible;
 }
 
-.louvre .stile {
-  fill: var(--stile);
-}
-
-.louvre .interior {
-  fill: var(--interior);
-}
-
-.louvre .blade-wet {
-  fill: var(--blade-wet);
-}
-
-.louvre .blade-overlap {
-  fill: rgb(0 0 0 / 0.32);
-}
-
-.louvre .slat {
-  fill: var(--slat);
-}
-
-.louvre .slat-edge {
-  fill: rgb(0 0 0 / 0.35);
+.louvre .column {
+  fill: none;
+  stroke: var(--ink-2);
+  stroke-opacity: 0.35;
 }
 
 .louvre .water {
   fill: var(--river);
 }
 
+.louvre .rule {
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
 .louvre .tick {
-  fill: var(--ink-2);
-  font-size: 14px;
-  font-weight: 500;
+  stroke: var(--ink-2);
+  stroke-width: 1;
 }
 
 .louvre .rail-label {
   font-size: 13px;
   font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--ground);
+  stroke-width: 3px;
 }
 
 .louvre .waterline {
@@ -472,34 +452,65 @@ select {
   stroke-width: 2;
 }
 
-.louvre .marker {
+.louvre .origin {
   fill: var(--ink);
 }
 
-.louvre .marker-text {
-  fill: var(--on-ink);
-  font-size: 14px;
+.louvre .dim {
+  stroke: var(--ink);
+  stroke-width: 1;
+}
+
+.louvre .dim-end {
+  fill: none;
+  stroke: var(--ink);
+  stroke-width: 1.5;
+}
+
+.louvre .dim-value {
+  fill: var(--ink);
+  font-size: 20px;
   font-weight: 700;
+  font-variant-numeric: tabular-nums lining-nums;
 }
 
-/* Each submerged blade swings shut in two steps, bottom blade first. */
-.louvre .blade-shut {
+.louvre .dim-unit {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* The water rises once, then the waterline and its dimension lock in. */
+.louvre .water {
   transform-box: fill-box;
-  transform-origin: top;
-  animation: blade-shut 180ms steps(2, end) both;
+  transform-origin: bottom;
+  animation: water-rise 700ms cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 
-@keyframes blade-shut {
+.louvre .reading {
+  animation: reading-in 300ms ease-out 700ms both;
+}
+
+@keyframes water-rise {
   from {
-    transform: scaleY(0.43);
+    transform: scaleY(0);
   }
   to {
     transform: scaleY(1);
   }
 }
 
+@keyframes reading-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
-  .louvre .blade-shut {
+  .louvre .water,
+  .louvre .reading {
     animation: none;
   }
   .site-head {
@@ -660,6 +671,15 @@ select {
 .chart .axis-text {
   fill: var(--ink-2);
   font-size: 11px;
+}
+
+/* Rail names sit just above their line, knocked out of the grid like on the gauge. */
+.chart .rail-name {
+  fill: var(--ink);
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--ground);
+  stroke-width: 3px;
 }
 
 .chart .area {

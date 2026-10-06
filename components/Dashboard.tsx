@@ -184,7 +184,7 @@ export function Dashboard({ initial }: { initial: PublicState }) {
               provisional={state.thresholdsArePlaceholders}
             />
             <p style={{ fontSize: "0.8125rem", marginTop: 6, color: "var(--ink-2)" }}>
-              ช่องละ 10 ซม.
+              ขีดละ 10 ซม.
               {state.thresholdsArePlaceholders && (
                 <>
                   <br />* เกณฑ์ชั่วคราว รอผู้ดูแลยืนยัน

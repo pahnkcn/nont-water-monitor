@@ -1,6 +1,6 @@
 {
   "schemaVersion": 2,
-  "generatedAt": "2026-10-03T17:00:30.098Z",
+  "generatedAt": "2026-10-06T07:15:55.000Z",
   "title": "Design System: ระดับน้ำท่าน้ำนนท์ (Nont Water)",
   "extensions": {
     "colorMeta": {
@@ -177,54 +177,6 @@
           "#c4a85a",
           "#e4cc8b",
           "#ffedb7"
-        ]
-      },
-      "stile": {
-        "role": "neutral",
-        "displayName": "Shutter Frame",
-        "canonical": "#1e2b2a",
-        "oklch": "oklch(27.7% 0.018 190.3)",
-        "tonalRamp": [
-          "#030e0d",
-          "#1a2726",
-          "#384644",
-          "#586765",
-          "#7b8a88",
-          "#9fafad",
-          "#c1d2d0",
-          "#e2f3f1"
-        ]
-      },
-      "interior": {
-        "role": "neutral",
-        "displayName": "Dark Room",
-        "canonical": "#2c3836",
-        "oklch": "oklch(32.9% 0.016 184.1)",
-        "tonalRamp": [
-          "#040d0c",
-          "#1b2725",
-          "#394543",
-          "#596664",
-          "#7c8a87",
-          "#a0aeac",
-          "#c3d1cf",
-          "#e3f2f0"
-        ]
-      },
-      "blade-wet": {
-        "role": "neutral",
-        "displayName": "Wet Blade",
-        "canonical": "#7a6235",
-        "oklch": "oklch(51.0% 0.070 81.8)",
-        "tonalRamp": [
-          "#190600",
-          "#341f00",
-          "#553e0e",
-          "#775f32",
-          "#9b8255",
-          "#c1a778",
-          "#e5ca9a",
-          "#ffebba"
         ]
       },
       "action-bg": {
@@ -467,54 +419,6 @@
           "#ffeeb7"
         ]
       },
-      "night-stile": {
-        "role": "neutral",
-        "displayName": "Night Frame",
-        "canonical": "#3c4a47",
-        "oklch": "oklch(39.6% 0.019 180.9)",
-        "tonalRamp": [
-          "#030e0c",
-          "#1a2724",
-          "#384643",
-          "#586764",
-          "#7b8a87",
-          "#9fafab",
-          "#c1d2ce",
-          "#e2f3ef"
-        ]
-      },
-      "night-interior": {
-        "role": "neutral",
-        "displayName": "Night Dark Room",
-        "canonical": "#070b0a",
-        "oklch": "oklch(14.4% 0.007 179.6)",
-        "tonalRamp": [
-          "#080c0b",
-          "#202524",
-          "#3e4442",
-          "#5f6563",
-          "#828886",
-          "#a6acab",
-          "#c9cfce",
-          "#e9f0ee"
-        ]
-      },
-      "night-blade-wet": {
-        "role": "neutral",
-        "displayName": "Night Wet Blade",
-        "canonical": "#8a7140",
-        "oklch": "oklch(56.1% 0.074 83.0)",
-        "tonalRamp": [
-          "#190600",
-          "#351f00",
-          "#553e07",
-          "#785f2e",
-          "#9c8251",
-          "#c2a775",
-          "#e5ca97",
-          "#ffebb7"
-        ]
-      },
       "night-action-bg": {
         "role": "primary",
         "displayName": "Deep Silt Action",
@@ -643,16 +547,6 @@
         "name": "primary-hover-underline",
         "value": "inset 0 -3px 0 var(--river)",
         "purpose": "Primary button hover: an inset silt rule, not elevation. The only box-shadow in the system."
-      },
-      {
-        "name": "louvre-slat-edge",
-        "value": "fill rgb(0 0 0 / 0.35), 1.5px under each open blade",
-        "purpose": "Material shadow inside the louvre gauge only."
-      },
-      {
-        "name": "louvre-blade-overlap",
-        "value": "fill rgb(0 0 0 / 0.32), 2px seam atop each shut blade",
-        "purpose": "Material overlap inside the louvre gauge only."
       }
     ],
     "motion": [
@@ -662,9 +556,14 @@
         "purpose": "Header band changing state colour."
       },
       {
-        "name": "blade-shut",
-        "value": "180ms steps(2, end), scaleY 0.43 -> 1, transform-origin top, 70ms stagger bottom blade first",
-        "purpose": "Submerged louvre blades swinging shut."
+        "name": "gauge-water-rise",
+        "value": "700ms cubic-bezier(0.16, 1, 0.3, 1), scaleY 0 -> 1, transform-origin bottom",
+        "purpose": "The gauge's water column rising once on mount."
+      },
+      {
+        "name": "gauge-reading-in",
+        "value": "300ms ease-out after 700ms, opacity 0 -> 1",
+        "purpose": "Waterline and dimension locking in after the water settles."
       },
       {
         "name": "control",
@@ -679,7 +578,7 @@
       {
         "name": "reduced-motion",
         "value": "none",
-        "purpose": "prefers-reduced-motion disables blade-shut and band transition."
+        "purpose": "prefers-reduced-motion disables the gauge water rise, the reading fade and the band transition."
       }
     ],
     "breakpoints": [
@@ -716,6 +615,16 @@
         "name": "empty",
         "value": "1.5px dashed var(--slat-edge)",
         "purpose": "Chart empty/error states."
+      },
+      {
+        "name": "rail",
+        "value": "2px solid var(--watch) | var(--danger)",
+        "purpose": "Threshold rails on the gauge and the chart; name in ink with a 3px ground knockout."
+      },
+      {
+        "name": "dimension",
+        "value": "1px solid var(--ink), 45° 1.5px ink slash terminators",
+        "purpose": "Gauge dimension line from the waterline to the next threshold."
       }
     ],
     "focus": {
@@ -783,12 +692,12 @@
       "css": ".ds-inline{display:flex;align-items:center;gap:12px;font-family:Anuphan,\"Noto Sans Thai\",sans-serif;color:var(--ink,#1e2b2a)}.ds-select{min-height:44px;padding:0 12px;border:1.5px solid var(--ink,#1e2b2a);border-radius:2px;background:var(--ground,#e4e6e1);color:inherit;font:inherit}.ds-select:focus-visible{outline:3px solid var(--ink,#1e2b2a);outline-offset:3px}"
     },
     {
-      "name": "Louvre Gauge",
+      "name": "Dimension Gauge",
       "kind": "custom",
       "refersTo": "louvre",
-      "description": "Signature: open blades over the dark room above water, silted shut blades below, balustrade rails at thresholds, ink reading flag.",
-      "html": "<svg class=\"ds-louvre\" viewBox=\"0 0 212 164\" role=\"img\" aria-label=\"ระดับน้ำ 1.17 ม.\"><defs><pattern id=\"dsw\" width=\"10\" height=\"10\" patternUnits=\"userSpaceOnUse\"><rect width=\"10\" height=\"10\" fill=\"#e4e6e1\"/><rect x=\"1\" y=\"1\" width=\"8\" height=\"8\" fill=\"none\" stroke=\"#b65a2c\" stroke-width=\"1.6\"/><path d=\"M2.2 2.2 7.8 7.8M7.8 2.2 2.2 7.8\" stroke=\"#b65a2c\" stroke-width=\"1.4\"/></pattern><pattern id=\"dsd\" width=\"10\" height=\"10\" patternUnits=\"userSpaceOnUse\"><rect width=\"10\" height=\"10\" fill=\"#e4e6e1\"/><rect x=\"1\" y=\"1\" width=\"8\" height=\"8\" fill=\"none\" stroke=\"#a3201a\" stroke-width=\"1.6\"/><path d=\"M2.2 2.2 7.8 7.8M7.8 2.2 2.2 7.8\" stroke=\"#a3201a\" stroke-width=\"1.4\"/></pattern></defs><rect class=\"stile\" x=\"64\" y=\"6\" width=\"92\" height=\"152\"/><rect class=\"interior\" x=\"70\" y=\"12\" width=\"80\" height=\"140\"/><g class=\"open\"><rect class=\"slat\" x=\"70\" y=\"13\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"19\" width=\"80\" height=\"1.5\"/><rect class=\"slat\" x=\"70\" y=\"27\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"33\" width=\"80\" height=\"1.5\"/><rect class=\"slat\" x=\"70\" y=\"41\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"47\" width=\"80\" height=\"1.5\"/><rect class=\"slat\" x=\"70\" y=\"55\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"61\" width=\"80\" height=\"1.5\"/><rect class=\"slat\" x=\"70\" y=\"69\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"75\" width=\"80\" height=\"1.5\"/><rect class=\"slat\" x=\"70\" y=\"83\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"89\" width=\"80\" height=\"1.5\"/><rect class=\"slat\" x=\"70\" y=\"97\" width=\"80\" height=\"6\"/><rect class=\"edge\" x=\"70\" y=\"103\" width=\"80\" height=\"1.5\"/></g><rect class=\"water\" x=\"70\" y=\"110\" width=\"80\" height=\"42\"/><g class=\"shut\"><rect class=\"wet\" x=\"70\" y=\"110\" width=\"80\" height=\"14\"/><rect class=\"seam\" x=\"70\" y=\"110\" width=\"80\" height=\"2\"/><rect class=\"wet\" x=\"70\" y=\"124\" width=\"80\" height=\"14\"/><rect class=\"seam\" x=\"70\" y=\"124\" width=\"80\" height=\"2\"/><rect class=\"wet\" x=\"70\" y=\"138\" width=\"80\" height=\"14\"/><rect class=\"seam\" x=\"70\" y=\"138\" width=\"80\" height=\"2\"/></g><rect x=\"60\" y=\"31\" width=\"96\" height=\"10\" fill=\"url(#dsd)\"/><line x1=\"60\" x2=\"156\" y1=\"31\" y2=\"31\" stroke=\"#a3201a\" stroke-width=\"2\"/><text class=\"rail\" x=\"57\" y=\"32\" text-anchor=\"end\">อันตราย</text><text class=\"rail\" x=\"57\" y=\"48\" text-anchor=\"end\">2.50*</text><rect x=\"60\" y=\"73\" width=\"96\" height=\"10\" fill=\"url(#dsw)\"/><line x1=\"60\" x2=\"156\" y1=\"73\" y2=\"73\" stroke=\"#b65a2c\" stroke-width=\"2\"/><text class=\"rail\" x=\"57\" y=\"74\" text-anchor=\"end\">เฝ้าระวัง</text><text class=\"rail\" x=\"57\" y=\"90\" text-anchor=\"end\">2.20*</text><line class=\"waterline\" x1=\"70\" x2=\"160\" y1=\"110\" y2=\"110\"/><path class=\"flag\" d=\"M160 110 l6 -11 h46 v22 h-46 z\"/><text class=\"flagt\" x=\"168\" y=\"115\">1.17</text></svg>",
-      "css": ".ds-louvre{display:block;width:212px;height:auto;overflow:visible;font-family:Anuphan,\"Noto Sans Thai\",sans-serif;font-variant-numeric:tabular-nums lining-nums;color:var(--ink,#1e2b2a)}.ds-louvre .stile{fill:var(--stile,#1e2b2a)}.ds-louvre .interior{fill:var(--interior,#2c3836)}.ds-louvre .slat{fill:var(--slat,#eceee9)}.ds-louvre .edge{fill:rgb(0 0 0/.35)}.ds-louvre .water{fill:var(--river,#7a6235)}.ds-louvre .wet{fill:var(--blade-wet,#7a6235)}.ds-louvre .seam{fill:rgb(0 0 0/.32)}.ds-louvre .shut>*{transform-box:fill-box;transform-origin:top;animation:ds-shut 180ms steps(2,end) both}.ds-louvre .rail{font-size:13px;font-weight:700;fill:currentColor}.ds-louvre .waterline{stroke:var(--ink,#1e2b2a);stroke-width:2}.ds-louvre .flag{fill:var(--ink,#1e2b2a)}.ds-louvre .flagt{fill:var(--on-ink,#f1f2ee);font-size:14px;font-weight:700}@keyframes ds-shut{from{transform:scaleY(.43)}to{transform:scaleY(1)}}@media (prefers-reduced-motion:reduce){.ds-louvre .shut>*{animation:none}}"
+      "description": "Signature: one ruler marked every 10 cm, a silt water column, plain 2px threshold rails, and a dimension line from the waterline to the next threshold carrying the numeral's centimetres.",
+      "html": "<figure class=\"ds-gauge\"><svg viewBox=\"0 0 212 346\" role=\"img\" aria-label=\"ไม้วัดจำลอง อีก 103 ซม. ถึงระดับเฝ้าระวัง ขีดละ 10 ซม.\"><rect class=\"ds-g-col\" x=\"64.5\" y=\"12.5\" width=\"31\" height=\"321\"/><rect class=\"ds-g-water\" x=\"64\" y=\"268.2\" width=\"32\" height=\"65.8\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"106\" y1=\"12\" y2=\"12\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"26\" y2=\"26\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"40\" y2=\"40\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"54\" y2=\"54\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"68\" y2=\"68\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"106\" y1=\"82\" y2=\"82\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"96\" y2=\"96\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"110\" y2=\"110\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"124\" y2=\"124\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"138\" y2=\"138\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"106\" y1=\"152\" y2=\"152\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"166\" y2=\"166\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"180\" y2=\"180\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"194\" y2=\"194\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"208\" y2=\"208\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"106\" y1=\"222\" y2=\"222\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"236\" y2=\"236\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"250\" y2=\"250\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"264\" y2=\"264\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"278\" y2=\"278\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"106\" y1=\"292\" y2=\"292\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"306\" y2=\"306\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"320\" y2=\"320\"/><line class=\"ds-g-tick\" x1=\"96\" x2=\"101\" y1=\"334\" y2=\"334\"/><line class=\"ds-g-rule\" x1=\"96\" x2=\"96\" y1=\"12\" y2=\"334\"/><line x1=\"60\" x2=\"108\" y1=\"124.0\" y2=\"124.0\" stroke=\"var(--watch)\" stroke-width=\"2\"/><text class=\"ds-g-rail\" x=\"56\" y=\"128.5\" text-anchor=\"end\">เฝ้าระวัง*</text><line x1=\"60\" x2=\"108\" y1=\"82.0\" y2=\"82.0\" stroke=\"var(--danger)\" stroke-width=\"2\"/><text class=\"ds-g-rail\" x=\"56\" y=\"86.5\" text-anchor=\"end\">อันตราย*</text><g class=\"ds-g-reading\"><line class=\"ds-g-waterline\" x1=\"64\" x2=\"132\" y1=\"268.2\" y2=\"268.2\"/><circle class=\"ds-g-origin\" cx=\"132\" cy=\"268.2\" r=\"2.5\"/><line x1=\"108\" x2=\"137\" y1=\"124.0\" y2=\"124.0\" stroke=\"var(--watch)\" stroke-width=\"1\"/><line class=\"ds-g-dim\" x1=\"132\" x2=\"132\" y1=\"124.0\" y2=\"268.2\"/><path class=\"ds-g-end\" d=\"M128 128.0 l8 -8 M128 272.2 l8 -8\"/><text class=\"ds-g-value\" x=\"139\" y=\"203.1\">103<tspan class=\"ds-g-unit\"> ซม.</tspan></text></g></svg><figcaption>ขีดละ 10 ซม. · * เกณฑ์ชั่วคราว</figcaption></figure>",
+      "css": ".ds-gauge{margin:0;width:212px;font-family:var(--font-ui),Anuphan,\"Noto Sans Thai\",sans-serif;color:var(--ink)}.ds-gauge svg{display:block;width:100%;height:auto;overflow:visible}.ds-gauge figcaption{margin-top:6px;font-size:0.8125rem;color:var(--ink-2)}.ds-g-col{fill:none;stroke:var(--ink-2);stroke-opacity:.35}.ds-g-water{fill:var(--river);transform-box:fill-box;transform-origin:bottom;animation:ds-g-rise 700ms cubic-bezier(0.16,1,0.3,1) both}.ds-g-rule{stroke:var(--ink);stroke-width:1.5}.ds-g-tick{stroke:var(--ink-2);stroke-width:1}.ds-g-rail{fill:var(--ink);font-size:13px;font-weight:700;paint-order:stroke;stroke:var(--ground);stroke-width:3px}.ds-g-waterline{stroke:var(--ink);stroke-width:2}.ds-g-origin{fill:var(--ink)}.ds-g-dim{stroke:var(--ink);stroke-width:1}.ds-g-end{fill:none;stroke:var(--ink);stroke-width:1.5}.ds-g-value{fill:var(--ink);font-size:20px;font-weight:700;font-variant-numeric:tabular-nums lining-nums}.ds-g-unit{font-size:13px;font-weight:600}.ds-g-reading{animation:ds-g-in 300ms ease-out 700ms both}@keyframes ds-g-rise{from{transform:scaleY(0)}to{transform:scaleY(1)}}@keyframes ds-g-in{from{opacity:0}to{opacity:1}}@media (prefers-reduced-motion:reduce){.ds-g-water,.ds-g-reading{animation:none}}"
     },
     {
       "name": "Alert Log Row",
@@ -801,11 +710,11 @@
   ],
   "narrative": {
     "northStar": "Old Hall Veranda",
-    "overview": "You read the river level through the louvred awnings of the 1910 Nonthaburi provincial hall, which faces the water at the pier. One blade equals 10 cm, the same step as the marks on the staff gauge. Above the water the blades stand open on a dark interior. Below it they are shut and silted. The watch and danger thresholds cross the shutter as brick-orange and red balustrade rails. Everything else on the surface comes from the same building: whitewashed ground, eave-shadow ink, Chao Phraya silt for water, the gilt of the signboard for the wordmark.\n\nThe system is flat and typographic. Hierarchy comes from scale: one very large tabular numeral, then plain Thai text at near-body sizes. Structure comes from 2px ink rules and hairline slat-edge rules, not from containers. The state of the river owns the whole header band. Night is a separate palette built for reading at 2 a.m., not an inversion of the day palette. It has its own deep-silt action colour, so no light slab ever appears in the dark.\n\nThe build has no cards, no drop shadows and no gradients. Status is never shown by colour alone.",
+    "overview": "You read the river level through the louvred awnings of the 1910 Nonthaburi provincial hall, which faces the water at the pier. The staff gauge itself is drawn like a dimension on the hall's survey drawing: one ruler marked every 10 cm, a silt column for the water, and a dimension line from the waterline to the next threshold that carries the same centimetres as the big numeral. The watch and danger thresholds cross it as brick-orange and red rails. Everything else on the surface comes from the same building: whitewashed ground, eave-shadow ink, Chao Phraya silt for water, the gilt of the signboard for the wordmark.\n\nThe system is flat and typographic. Hierarchy comes from scale: one very large tabular numeral, then plain Thai text at near-body sizes. Structure comes from 2px ink rules and hairline slat-edge rules, not from containers. The state of the river owns the whole header band. Night is a separate palette built for reading at 2 a.m., not an inversion of the day palette. It has its own deep-silt action colour, so no light slab ever appears in the dark.\n\nThe build has no cards, no drop shadows and no gradients. Status is never shown by colour alone.",
     "keyCharacteristics": [
       "A full-strength state colour fills the sticky header band. The wordmark sits left and the state word with its shape icon sits right.",
       "A giant tabular numeral is sized by its own column (container query).",
-      "The louvre gauge is the signature instrument. Its geometry (rails, silt fill, waterline) repeats in the chart.",
+      "The dimension-line gauge is the signature instrument. It restates the numeral as a measured distance, so the drawing and the number can never disagree.",
       "Choices are built as slats: segmented tabs and stacked option rows where the chosen slat closes dark.",
       "Every corner is square (2px). Rules are 1px hairlines, 1.5px control strokes and 2px section rules.",
       "Light and night are two separate palettes. The night palette is applied by `[data-theme=\"dark\"]` or by `prefers-color-scheme` unless the user has chosen light."
@@ -843,20 +752,21 @@
       },
       {
         "name": "The Flat Veranda Rule",
-        "body": "No drop shadows, no gradients, no cards. Depth is allowed only inside the louvre gauge, where it describes the shutter.",
+        "body": "No drop shadows, no gradients, no cards, and no depth anywhere, the gauge included.",
         "section": "elevation"
       }
     ],
     "dos": [
       "Do fill the whole header band with the current state colour and pair the state word with its circle, triangle or octagon icon.",
       "Do size the level numeral from its column with `clamp(4.5rem, 50cqi, 10rem)` and tabular lining figures.",
-      "Do draw thresholds as cross-in-square balustrade rails with a text label and value, and add an asterisk while they are provisional.",
+      "Do draw every threshold as a plain 2px rail in its state colour, labelled with its name, with an asterisk while it is provisional. Gauge and chart use the same rail.",
       "Do build choices as slats: a 1.5px ink frame, ink dividers, and the chosen slat filled with the action tokens.",
       "Do use the action tokens (not ink) for any selected or primary fill, so night mode stays deep silt with gilt.",
       "Do keep corners at 2px and separate sections with a 2px ink rule and white space."
     ],
     "donts": [
-      "Don't use cards, drop shadows or gradients. Depth belongs only to the louvre's blades.",
+      "Don't use cards, drop shadows, gradients or depth anywhere.",
+      "Don't compute the gauge's dimension separately from the numeral. Both come from `thresholdGap()`.",
       "Don't let colour carry status alone. Every state needs its shape or its word.",
       "Don't use gilt outside the wordmark and the night action, and don't set Taviraj anywhere but the wordmark.",
       "Don't delete alert-log entries. Strike them through when the water falls.",
