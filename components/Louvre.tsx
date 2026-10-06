@@ -19,13 +19,13 @@ type Props = {
 const PITCH = 14; // px per 10 cm
 const TOP_PAD = 12;
 const W = 212;
-const LABEL_X = 56; // rail names end here
 const COL_X = 64;
 const COL_W = 32;
 const RULE_X = COL_X + COL_W;
 const RAIL_END = 108;
 const DIM_X = 132;
 const TERM = 4; // half-length of a 45° dimension terminator
+const CROWD = 28; // rails closer than this put watch's name under its rail
 
 export function louvreRange(level: number | null, danger: number) {
   const top = Math.max(3.0, Math.ceil((danger + 0.3) * 10) / 10);
@@ -86,21 +86,9 @@ export function Louvre({ level, estimate, watch, danger, provisional }: Props) {
 
       {/* threshold rails */}
       {rails.map((r) => {
-        const ry = y(r.value);
-        // Labels sit level with their rail; when the rails crowd, danger's lifts above and watch's drops below.
-        const crowded = rails.length === 2 && Math.abs(y(watch) - y(danger)) < 20;
-        const nameY = crowded ? (r.key === "danger" ? ry - 8 : ry + 17) : ry + 4.5;
         // When the two rails would overlap, the lower (watch) rail thins so danger stays whole.
         const thin = r.key === "watch" && Math.abs(y(watch) - y(danger)) < 5;
-        return (
-          <g key={r.key}>
-            <line x1={LABEL_X + 4} x2={RAIL_END} y1={ry} y2={ry} stroke={r.color} strokeWidth={thin ? 1 : 2} />
-            <text className="rail-label" x={LABEL_X} y={nameY} textAnchor="end" fill="currentColor">
-              {r.label}
-              {mark}
-            </text>
-          </g>
-        );
+        return <line key={r.key} x1={0} x2={RAIL_END} y1={y(r.value)} y2={y(r.value)} stroke={r.color} strokeWidth={thin ? 1 : 2} />;
       })}
 
       {/* the reading: waterline and the dimension to the next threshold */}
@@ -129,6 +117,18 @@ export function Louvre({ level, estimate, watch, danger, provisional }: Props) {
           )}
         </g>
       )}
+
+      {/* Rail names sit on their rail, as on the chart, and paint last so their knockout stays whole.
+          When the rails crowd, watch's name drops below its rail; dy in em follows the CSS font size. */}
+      {rails.map((r) => {
+        const below = r.key === "watch" && rails.length === 2 && y(watch) - y(danger) < CROWD;
+        return (
+          <text key={r.key} className="rail-label" x={0} y={y(r.value) + (below ? 4 : -5)} dy={below ? "1.1em" : undefined} fill="currentColor">
+            {r.label}
+            {mark}
+          </text>
+        );
+      })}
     </svg>
   );
 }

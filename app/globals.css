@@ -439,12 +439,22 @@ select {
   stroke-width: 1;
 }
 
+/* Sizes are viewBox units. On a phone the gauge shrinks to about 0.7 of its viewBox,
+   so the names start larger there to land near 14px on screen. */
 .louvre .rail-label {
-  font-size: 13px;
+  font-size: 19px;
   font-weight: 700;
   paint-order: stroke;
   stroke: var(--ground);
-  stroke-width: 3px;
+  stroke-width: 4px;
+  stroke-linejoin: round;
+}
+
+@media (min-width: 640px) {
+  .louvre .rail-label {
+    font-size: 14px;
+    stroke-width: 3px;
+  }
 }
 
 .louvre .waterline {
@@ -676,7 +686,8 @@ select {
 /* Rail names sit just above their line, knocked out of the grid like on the gauge. */
 .chart .rail-name {
   fill: var(--ink);
-  font-weight: 600;
+  font-size: 13px;
+  font-weight: 700;
   paint-order: stroke;
   stroke: var(--ground);
   stroke-width: 3px;

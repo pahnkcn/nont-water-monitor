@@ -226,13 +226,17 @@ export function LevelChart({ day, watch, danger, now, provisional }: Props) {
               ))}
               <path className="area" d={geo.area} />
               <path className="line" d={geo.line} />
-              {/* rail names paint over the line so their knockout keeps them legible */}
-              {geo.rails.map((r) => (
-                <text key={r.key} x={PAD.left + 6} y={geo.y(r.value) - 6} className="axis-text rail-name">
-                  {r.label}
-                  {provisional ? "*" : ""}
-                </text>
-              ))}
+              {/* rail names paint over the line so their knockout keeps them legible;
+                  when the rails crowd, watch's name drops below its line */}
+              {geo.rails.map((r) => {
+                const below = r.key === "watch" && geo.rails.length === 2 && geo.y(watch) - geo.y(danger) < 22;
+                return (
+                  <text key={r.key} x={PAD.left + 6} y={geo.y(r.value) + (below ? 17 : -6)} className="axis-text rail-name">
+                    {r.label}
+                    {provisional ? "*" : ""}
+                  </text>
+                );
+              })}
               {geo.singles.map((p) => (
                 <circle key={p[0]} className="dot" cx={geo.x(p[0])} cy={geo.y(p[1])} r="4" />
               ))}
