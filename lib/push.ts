@@ -5,16 +5,36 @@ export type PushTarget = { endpoint: string; keys: { p256dh: string; auth: strin
 
 let configured = false;
 
-export function vapidPublicKey() {
-  return process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? process.env.VAPID_PUBLIC_KEY ?? "";
+type Env = Record<string, string | undefined>;
+
+export function vapidPublicKey(env: Env = process.env) {
+  return env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? env.VAPID_PUBLIC_KEY ?? "";
+}
+
+export type PushProblem = "public-key" | "private-key" | "subject-missing" | "subject-format" | "subject-localhost";
+
+/**
+ * The contact sent to push services with every message, and anything that would stop delivery.
+ * Apple's push service (every iPhone) rejects a subject that is not an https: URL or a mailto:
+ * address, and rejects localhost. Without VAPID_SUBJECT the site's own address is used.
+ */
+export function pushConfig(env: Env = process.env): { subject: string | null; problems: PushProblem[] } {
+  const problems: PushProblem[] = [];
+  if (!vapidPublicKey(env)) problems.push("public-key");
+  if (!env.VAPID_PRIVATE_KEY) problems.push("private-key");
+  const site = env.SITE_URL?.replace(/\/$/, "") ?? (env.VERCEL_PROJECT_PRODUCTION_URL && `https://${env.VERCEL_PROJECT_PRODUCTION_URL}`);
+  const subject = env.VAPID_SUBJECT || site || null;
+  if (!subject) problems.push("subject-missing");
+  else if (!/^(https:\/\/[^/\s]+|mailto:\S+@\S+)/.test(subject)) problems.push("subject-format");
+  else if (/^https:\/\/(localhost|127\.0\.0\.1|\[::1\])(:|\/|$)/.test(subject)) problems.push("subject-localhost");
+  return { subject, problems };
 }
 
 function configure() {
   if (configured) return;
-  const publicKey = vapidPublicKey();
-  const privateKey = process.env.VAPID_PRIVATE_KEY;
-  if (!publicKey || !privateKey) throw new Error("VAPID keys are not configured");
-  webpush.setVapidDetails(process.env.VAPID_SUBJECT ?? "https://nont-water.vercel.app", publicKey, privateKey);
+  const { subject, problems } = pushConfig();
+  if (problems.length) throw new Error(`Web push is not configured: ${problems.join(", ")}`);
+  webpush.setVapidDetails(subject as string, vapidPublicKey(), process.env.VAPID_PRIVATE_KEY as string);
   configured = true;
 }
 
@@ -40,8 +60,10 @@ export async function sendPush(target: PushTarget, msg: PushMessage, origin: str
     });
     return { ok: true };
   } catch (err) {
-    const status = (err as { statusCode?: number }).statusCode;
-    return { ok: false, gone: status === 404 || status === 410, status, error: String((err as Error).message ?? err) };
+    const { statusCode: status, body } = err as { statusCode?: number; body?: string };
+    // The push service's own reason (FCM, Mozilla, Apple) is in the body, not the message.
+    const reason = [String((err as Error).message ?? err), status, body?.trim().slice(0, 200)].filter(Boolean).join(" · ");
+    return { ok: false, gone: status === 404 || status === 410, status, error: reason };
   }
 }
 

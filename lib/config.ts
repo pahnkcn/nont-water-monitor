@@ -1,12 +1,17 @@
 import { DEFAULT_THRESHOLDS, type Thresholds } from "./alerts";
 import { DEFAULT_GAUGE_CONFIG, type GaugeConfig } from "./gauge-config";
 import { KEYS, kv } from "./kv";
+import { resetTracking, resyncAlerts } from "./store";
 
 export type SiteConfig = {
   thresholds: Thresholds;
   gauge: GaugeConfig;
+  /** Follow the gauge when the camera moves (lib/track.ts). Off reads the saved calibration as is. */
+  autoTrack: boolean;
   /** True until an admin has saved real thresholds. */
   thresholdsArePlaceholders: boolean;
+  /** Goes up by one each time a calibration is saved; a round that sees it change drops its tracking. */
+  calibration: number;
   updatedAt: number | null;
 };
 
@@ -19,7 +24,9 @@ export async function getConfig(): Promise<SiteConfig> {
   return {
     thresholds: { ...DEFAULT_THRESHOLDS, ...stored.thresholds },
     gauge: stored.gauge ?? DEFAULT_GAUGE_CONFIG,
+    autoTrack: stored.autoTrack ?? true,
     thresholdsArePlaceholders: !stored.thresholdsConfirmed,
+    calibration: stored.calibration ?? 0,
     updatedAt: stored.updatedAt ?? null,
   };
 }
@@ -46,13 +53,20 @@ export function validateGauge(g: GaugeConfig): string | null {
   return null;
 }
 
-export async function saveConfig(patch: { thresholds?: Thresholds; gauge?: GaugeConfig }) {
+export async function saveConfig(patch: { thresholds?: Thresholds; gauge?: GaugeConfig; autoTrack?: boolean }) {
   const stored = (await kv().get<StoredConfig>(KEYS.config)) ?? {};
   const next: StoredConfig = { ...stored, updatedAt: Date.now() };
   if (patch.thresholds) {
     next.thresholds = patch.thresholds;
     next.thresholdsConfirmed = true;
   }
-  if (patch.gauge) next.gauge = { ...patch.gauge, marks: [...patch.gauge.marks].sort((a, b) => a.y - b.y) };
+  if (patch.gauge) {
+    next.gauge = { ...patch.gauge, marks: [...patch.gauge.marks].sort((a, b) => a.y - b.y) };
+    next.calibration = (stored.calibration ?? 0) + 1;
+  }
+  if (typeof patch.autoTrack === "boolean") next.autoTrack = patch.autoTrack;
   await kv().set(KEYS.config, next);
+  // A calibration saved by hand is drawn on the camera as it is now: start tracking from it afresh.
+  if (patch.gauge) await resetTracking();
+  if (patch.thresholds) await resyncAlerts(patch.thresholds, Date.now());
 }

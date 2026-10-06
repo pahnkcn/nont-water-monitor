@@ -38,8 +38,10 @@ The only source is a live video of a physical staff gauge. This product reads th
 
 - Reading method: pixel analysis of the gauge face along a calibrated strip, median of several frames, confidence flag. No AI model.
 - Three states: ปกติ (normal), เฝ้าระวัง (watch), อันตราย (danger). Thresholds are set by the site admin; each subscriber chooses from which state they receive instant alerts and receives an all-clear when the level falls back.
+- Personal alert point: each device can move both thresholds by -50 to +30 cm (alert earlier for a low house, later for a raised one). Each device runs its own copy of the alert state machine; texts still measure distance against the site thresholds. The header status and the public alert log stay site-wide.
+- Camera tracking: every round the reader matches a grey patch around the dry top of the gauge against stored references (ZNCC, coarse-to-fine, shift ±80 px, zoom 0.85-1.15) and moves the calibration with the camera. A jump is held back for one round; a scene that does not match is refused rather than read. References for new light are learned automatically. The admin can switch tracking off, and devices marked as admin get camera notices by push.
 - Routine update frequencies: every 1 h, 3 h, 6 h, once a day at a chosen hour, or off (alerts only). Quiet hours apply to routine updates only, never to alerts.
-- Admin page for calibration and thresholds (password).
+- Admin page for calibration, thresholds, tracking status and admin notices (password). Needed rarely once tracking runs: real thresholds, the meter digit, and a camera that moved beyond tracking range.
 - Must run on free tiers: Vercel Hobby (non-commercial), Upstash free, cron-job.org free.
 - Open decisions: real watch/danger threshold values (placeholders 2.20 m / 2.50 m), the meter digit at the plate joint, the gauge datum.
 

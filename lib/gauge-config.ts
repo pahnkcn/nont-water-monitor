@@ -17,7 +17,7 @@ export type GaugeConfig = {
   axis: { top: Point; bottom: Point };
   /** Pixels sampled either side of the axis on each row. */
   halfWidth: number;
-  /** Rows that stay dry in any realistic flood; used to learn what "white" looks like. */
+  /** Rows that are normally dry: they teach the reader what "white" looks like and confirm the gauge is in view. */
   baseline: { y0: number; y1: number };
   /** Calibration marks, ordered top to bottom. */
   marks: GaugeMark[];

@@ -18,6 +18,18 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
   repeatStep: 0.1,
 };
 
+/**
+ * Personal alert points, in cm against the site thresholds. Negative alerts before the water
+ * gets there (a low house), positive only once it is that far over (a raised one).
+ */
+export const OFFSET_CHOICES = [-50, -30, -20, -10, 0, 10, 20, 30] as const;
+
+/** Both thresholds moved by the subscriber's offset. */
+export function personalThresholds(th: Thresholds, offsetCm: number): Thresholds {
+  const move = (v: number) => Math.round(v * 100 + offsetCm) / 100;
+  return { ...th, watch: move(th.watch), danger: move(th.danger) };
+}
+
 export type AlertState = {
   status: Status;
   since: number;
@@ -54,6 +66,12 @@ export function classify(level: number, th: Thresholds, current: Status): Status
   if (level >= th.watch) return "watch";
   if (current !== "normal" && level >= th.watch - th.hysteresis) return "watch";
   return "normal";
+}
+
+/** State for someone who has just picked an alert point: where the water already is, without an alert. */
+export function initialPersonalState(level: number | null, th: Thresholds, now: number): AlertState {
+  const status = level === null ? "normal" : classify(level, th, "normal");
+  return { status, since: now, lastAlertLevel: status === "normal" ? null : level, pending: null };
 }
 
 /**

@@ -960,6 +960,18 @@ details.table-view[open] .disclosure {
   background: var(--ground);
 }
 
+/* A line under a control: guidance in ink-2, or the live distance to the chosen point in ink. */
+.field-note {
+  margin: var(--space-2) 0 0;
+  color: var(--ink-2);
+  font-size: 0.9375rem;
+}
+
+.field-note[data-live] {
+  color: var(--ink);
+  font-weight: 600;
+}
+
 .status-line {
   min-height: 1.6em;
   margin-top: var(--space-3);

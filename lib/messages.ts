@@ -1,12 +1,13 @@
 import type { AlertEvent, Status, Thresholds } from "./alerts";
-import { STATUS_LABEL, cmBetween, formatGap, formatTime, formatTrend } from "./format";
+import type { TrackingNotice } from "./autotrack";
+import { REASON_LABEL, STATUS_LABEL, cmBetween, describeMove, formatGap, formatOffset, formatTime, formatTrend } from "./format";
 import type { Summary } from "./summary";
 
 export type PushMessage = {
   title: string;
   body: string;
   /** Same tag replaces the previous notification on the device. */
-  tag: "alert" | "digest" | "test";
+  tag: "alert" | "digest" | "test" | "system";
   url: string;
   image?: string;
   requireInteraction?: boolean;
@@ -17,17 +18,31 @@ export type PushMessage = {
 
 const PLACE = "ท่าน้ำนนท์";
 
-export function alertMessage(e: AlertEvent, th: Thresholds, opts: { snapshotUrl?: string; trend: number | null }): PushMessage {
+/**
+ * `e` comes from the subscriber's own alert point (site thresholds moved by `offsetCm`),
+ * but every distance in the text is measured against the site thresholds in `th`.
+ */
+export function alertMessage(
+  e: AlertEvent,
+  th: Thresholds,
+  opts: { snapshotUrl?: string; trend: number | null; offsetCm?: number },
+): PushMessage {
+  const offsetCm = opts.offsetCm ?? 0;
   const trend = formatTrend(opts.trend);
   const at = `อ่านเมื่อ ${formatTime(e.t)}`;
+  const mine = offsetCm ? `จุดเตือนของคุณ: ${formatOffset(offsetCm)}` : null;
   const base = { tag: "alert" as const, url: "/", urgency: "high" as const, ttl: 60 * 60, image: opts.snapshotUrl };
   switch (e.kind) {
     case "escalate": {
-      const over = cmBetween(e.level, e.to === "danger" ? th.danger : th.watch);
+      const limit = e.to === "danger" ? th.danger : th.watch;
+      const cm = cmBetween(e.level, limit);
+      const reached = e.level >= limit - 0.005;
       return {
         ...base,
-        title: `${STATUS_LABEL[e.to]}: น้ำ${PLACE}${over ? `เกินเกณฑ์ ${over} ซม.` : "ถึงเกณฑ์แล้ว"}`,
-        body: [e.to === "watch" ? formatGap(e.level, th) : null, trend, at].filter(Boolean).join(" · "),
+        title: reached
+          ? `${STATUS_LABEL[e.to]}: น้ำ${PLACE}${cm ? `เกินเกณฑ์ ${cm} ซม.` : "ถึงเกณฑ์แล้ว"}`
+          : `ใกล้ระดับ${STATUS_LABEL[e.to]}: น้ำ${PLACE}อีก ${cm} ซม.`,
+        body: [reached && e.to === "watch" ? formatGap(e.level, th) : null, mine, trend, at].filter(Boolean).join(" · "),
         requireInteraction: e.to === "danger",
       };
     }
@@ -35,15 +50,20 @@ export function alertMessage(e: AlertEvent, th: Thresholds, opts: { snapshotUrl?
       return {
         ...base,
         title: `น้ำยังสูงขึ้น: ${formatGap(e.level, th)}`,
-        body: [`สูงขึ้น ${cmBetween(e.level, e.previous)} ซม. จากการเตือนครั้งก่อน`, trend, at].filter(Boolean).join(" · "),
+        body: [`สูงขึ้น ${cmBetween(e.level, e.previous)} ซม. จากการเตือนครั้งก่อน`, mine, trend, at].filter(Boolean).join(" · "),
         requireInteraction: true,
       };
     case "clear":
       return {
         ...base,
         urgency: "normal",
-        title: e.to === "normal" ? "กลับสู่ระดับปกติ" : `พ้นระดับ${STATUS_LABEL[e.from]}`,
-        body: [e.to === "normal" ? formatGap(e.level, th) : `ยังอยู่ในระดับ${STATUS_LABEL[e.to]}`, trend, at]
+        // With a personal point the site level may never have been reached, so name the point instead.
+        title: offsetCm
+          ? `น้ำลดต่ำกว่าจุดเตือน${STATUS_LABEL[e.from]}ของคุณ`
+          : e.to === "normal"
+            ? "กลับสู่ระดับปกติ"
+            : `พ้นระดับ${STATUS_LABEL[e.from]}`,
+        body: [offsetCm || e.to === "normal" ? formatGap(e.level, th) : `ยังอยู่ในระดับ${STATUS_LABEL[e.to]}`, trend, at]
           .filter(Boolean)
           .join(" · "),
       };
@@ -89,4 +109,33 @@ export function testMessage(summary: Summary, status: Status, th: Thresholds): P
     urgency: "normal",
     ttl: 10 * 60,
   };
+}
+
+/** Notices for whoever runs the site, sent only to devices marked as admin. */
+export type SystemNotice = TrackingNotice | { kind: "camera-down"; since: number; reason: string | null };
+
+export function systemMessage(n: SystemNotice): PushMessage {
+  const base = { tag: "system" as const, url: "/admin", urgency: "normal" as const, ttl: 6 * 60 * 60 };
+  switch (n.kind) {
+    case "adjusted":
+      return {
+        ...base,
+        title: "ปรับตำแหน่งไม้วัดอัตโนมัติแล้ว",
+        body: `กล้องขยับ (${describeMove(n.from, n.to) ?? "เล็กน้อย"}) ระบบอ่านค่าที่ตำแหน่งใหม่แล้ว ตรวจเส้นขีดบนภาพได้ที่หน้าผู้ดูแล`,
+      };
+    case "lost":
+      return {
+        ...base,
+        title: "หาไม้วัดในภาพไม่เจอ",
+        body: `ตั้งแต่ ${formatTime(n.since)} ระบบไม่ใช้ค่าที่อ่านได้เพื่อไม่ให้เตือนผิด กล้องอาจหันไปทางอื่นหรือมีของบัง ตั้งตำแหน่งไม้วัดใหม่ได้ที่หน้าผู้ดูแล`,
+      };
+    case "camera-down":
+      return {
+        ...base,
+        title: "อ่านค่าจากกล้องไม่ได้ 1 ชั่วโมง",
+        body: [`ตั้งแต่ ${formatTime(n.since)}`, n.reason ? `สาเหตุล่าสุด: ${REASON_LABEL[n.reason] ?? n.reason}` : null]
+          .filter(Boolean)
+          .join(" · "),
+      };
+  }
 }

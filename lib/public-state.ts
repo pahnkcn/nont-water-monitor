@@ -2,6 +2,7 @@ import { getConfig } from "./config";
 import { getSnapshotMeta, getState, readingsSince, recentEvents, type LoggedEvent, type SnapshotMeta } from "./store";
 import { summarize, type StoredReading } from "./summary";
 import type { Status } from "./alerts";
+import type { TrackingStatus } from "./autotrack";
 
 const HOUR = 60 * 60 * 1000;
 const STALE_AFTER_MS = 30 * 60 * 1000;
@@ -20,6 +21,8 @@ export type PublicState = {
   failingSince: number | null;
   lastAttemptAt: number | null;
   lastReason: string | null;
+  /** Whether the reader is following a moved camera or has lost the gauge. */
+  tracking: TrackingStatus;
   events: LoggedEvent[];
   snapshot: SnapshotMeta | null;
   /** Readings for the past 24 h, oldest first. */
@@ -51,6 +54,7 @@ export async function getPublicState(now = Date.now()): Promise<PublicState> {
     failingSince: state.failingSince,
     lastAttemptAt: state.lastRead?.t ?? null,
     lastReason: state.lastRead && !state.lastRead.ok ? (state.lastRead.reason ?? null) : null,
+    tracking: state.tracking.status,
     events,
     snapshot,
     day: readings.filter((r) => r.t >= now - 24 * HOUR).map((r) => [r.t, r.level]),

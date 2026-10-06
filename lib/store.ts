@@ -1,10 +1,12 @@
 import { createHash } from "node:crypto";
-import type { AlertEvent, AlertPreference, AlertState } from "./alerts";
-import { INITIAL_ALERT_STATE } from "./alerts";
+import type { AlertEvent, AlertPreference, AlertState, Thresholds } from "./alerts";
+import { INITIAL_ALERT_STATE, OFFSET_CHOICES, initialPersonalState, personalThresholds, rank } from "./alerts";
+import { INITIAL_TRACKING, type TrackingState } from "./autotrack";
 import { KEYS, kv } from "./kv";
 import type { PushTarget } from "./push";
 import { DEFAULT_DIGEST, type DigestPref } from "./schedule";
 import type { StoredReading } from "./summary";
+import type { GaugeReference } from "./track";
 
 const DAY = 24 * 60 * 60 * 1000;
 export const HISTORY_DAYS = 35;
@@ -19,6 +21,11 @@ export async function addReading(r: StoredReading) {
 
 export async function readingsSince(since: number): Promise<StoredReading[]> {
   return kv().zrangeByScore<StoredReading>(KEYS.readings, since, Date.now() + 60_000);
+}
+
+/** The newest reading from the past two hours, if any. */
+export async function latestReading(): Promise<StoredReading | null> {
+  return (await readingsSince(Date.now() - 2 * 60 * 60 * 1000)).at(-1) ?? null;
 }
 
 // ---------- site state ----------
@@ -39,6 +46,8 @@ export type SiteState = {
   /** Start of the current run of failed reads; null when the last read worked. */
   failingSince: number | null;
   failureStreak: number;
+  /** Where the camera has the gauge now, relative to the saved calibration. */
+  tracking: TrackingState;
 };
 
 export const INITIAL_SITE_STATE: SiteState = {
@@ -47,6 +56,7 @@ export const INITIAL_SITE_STATE: SiteState = {
   lastSuccessAt: null,
   failingSince: null,
   failureStreak: 0,
+  tracking: INITIAL_TRACKING,
 };
 
 export async function getState(): Promise<SiteState> {
@@ -77,6 +87,30 @@ export async function getSnapshot(): Promise<Snapshot | null> {
   return kv().get<Snapshot>(KEYS.snapshot);
 }
 
+// ---------- gauge tracking ----------
+
+export async function getGaugeRefs(): Promise<GaugeReference[]> {
+  return (await kv().get<GaugeReference[]>(KEYS.gaugeRefs)) ?? [];
+}
+
+export async function setGaugeRefs(refs: GaugeReference[]) {
+  await kv().set(KEYS.gaugeRefs, refs);
+}
+
+/**
+ * Forget the references but keep the last known camera position, so the next clear round
+ * learns new ones right where the gauge is now.
+ */
+export async function clearGaugeRefs() {
+  await kv().del(KEYS.gaugeRefs);
+}
+
+/** After a new calibration: old references and the last known camera position no longer apply. */
+export async function resetTracking() {
+  await clearGaugeRefs();
+  await setState({ ...(await getState()), tracking: INITIAL_TRACKING });
+}
+
 // ---------- alert log ----------
 
 export type LoggedEvent = AlertEvent & { id: string };
@@ -99,6 +133,12 @@ export type Subscriber = {
   createdAt: number;
   lastDigestAt: number;
   lastTestAt?: number;
+  /** Personal alert point in cm against the site thresholds; see OFFSET_CHOICES. */
+  offsetCm?: number;
+  /** Alert state at the personal point. Missing on devices subscribed before personal points existed. */
+  alertState?: AlertState;
+  /** Gets camera and tracking notices meant for whoever runs the site. */
+  admin?: boolean;
 };
 
 export function subscriberId(endpoint: string) {
@@ -137,6 +177,10 @@ export function sanitizeAlerts(a: unknown, fallback: AlertPreference = "danger")
   return a === "watch" || a === "danger" || a === "off" ? a : fallback;
 }
 
+export function sanitizeOffset(v: unknown, fallback = 0): number {
+  return (OFFSET_CHOICES as readonly unknown[]).includes(v) ? (v as number) : fallback;
+}
+
 export async function getSubscriber(id: string) {
   return kv().hget<Subscriber>(KEYS.subs, id);
 }
@@ -151,6 +195,59 @@ export async function subscriberCount() {
 
 export async function saveSubscribers(subs: Subscriber[]) {
   await kv().hset(KEYS.subs, Object.fromEntries(subs.map((s) => [s.id, s])));
+}
+
+/** What a round changes on a device: its state at its own alert point, and when its last update went out. */
+export type RoundUpdate = { id: string; offsetCm: number; alertState?: AlertState; lastDigestAt?: number };
+
+/**
+ * Apply a round's results to the records as they are now, not as they were when the round began.
+ * A device unsubscribed meanwhile stays gone, and a newly picked alert point keeps the starting
+ * state the subscribe route gave it.
+ */
+export async function applyRoundUpdates(updates: RoundUpdate[]) {
+  if (!updates.length) return;
+  const current = await kv().hgetall<Subscriber>(KEYS.subs);
+  const merged: Subscriber[] = [];
+  for (const u of updates) {
+    const sub = current[u.id];
+    if (!sub) continue;
+    const next = { ...sub };
+    if (u.lastDigestAt !== undefined) next.lastDigestAt = Math.max(sub.lastDigestAt, u.lastDigestAt);
+    if (u.alertState && (sub.offsetCm ?? 0) === u.offsetCm) next.alertState = u.alertState;
+    merged.push(next);
+  }
+  if (merged.length) await saveSubscribers(merged);
+}
+
+/**
+ * After new thresholds are saved: lower the site's and every device's alert state to what the
+ * latest reading meets under them, without notifications, so the header, the page and every text
+ * agree at once. A state that would rise is left to the next round, which alerts as usual.
+ */
+export async function resyncAlerts(th: Thresholds, now: number) {
+  const latest = await latestReading();
+  if (!latest) return;
+  const lowered = (current: AlertState, t: Thresholds) => {
+    const fresh = initialPersonalState(latest.level, t, now);
+    return rank(fresh.status) < rank(current.status) ? fresh : null;
+  };
+
+  const state = await getState();
+  const site = lowered(state.alert, th);
+  if (site) {
+    await setState({ ...state, alert: site });
+    // Strikes the old alert through in the public log.
+    await logEvents([{ kind: "clear", from: state.alert.status, to: site.status, level: latest.level, t: now }]);
+  }
+
+  const updates: RoundUpdate[] = [];
+  for (const sub of await allSubscribers()) {
+    const offsetCm = sub.offsetCm ?? 0;
+    const mine = lowered(sub.alertState ?? state.alert, personalThresholds(th, offsetCm));
+    if (mine) updates.push({ id: sub.id, offsetCm, alertState: mine });
+  }
+  await applyRoundUpdates(updates);
 }
 
 export async function removeSubscribers(ids: string[]) {

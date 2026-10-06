@@ -2,15 +2,50 @@
 
 import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } from "react";
 import type { Thresholds } from "@/lib/alerts";
+import { MAX_REFS, type TrackingStatus } from "@/lib/autotrack";
 import type { SiteConfig } from "@/lib/config";
-import { STATUS_LABEL, formatDateTime } from "@/lib/format";
+import { REASON_LABEL, STATUS_LABEL, describeMove, formatDateTime } from "@/lib/format";
 import type { GaugeConfig } from "@/lib/gauge-config";
 import type { SiteState, SnapshotMeta } from "@/lib/store";
+import type { PushProblem } from "@/lib/push";
+import { IDENTITY, applyTransform } from "@/lib/track";
+import { pushSubscription } from "./usePush";
 
-type AdminData = { config: SiteConfig; state: SiteState; snapshot: SnapshotMeta | null; subscribers: number };
-type Msg = { text: string; tone: "ok" | "bad" } | null;
+type AdminData = {
+  config: SiteConfig;
+  state: SiteState;
+  snapshot: SnapshotMeta | null;
+  subscribers: number;
+  refs: { t: number; meanLuma: number }[];
+  push: { subject: string | null; problems: PushProblem[] };
+};
+
+const PUSH_PROBLEM: Record<PushProblem, string> = {
+  "public-key": "ยังไม่ได้ตั้ง VAPID_PUBLIC_KEY",
+  "private-key": "ยังไม่ได้ตั้ง VAPID_PRIVATE_KEY",
+  "subject-missing": "ยังไม่ได้ตั้ง VAPID_SUBJECT",
+  "subject-format": "VAPID_SUBJECT ต้องขึ้นต้นด้วย https:// หรือ mailto: ไม่อย่างนั้น iPhone จะไม่ได้รับการแจ้งเตือน",
+  "subject-localhost": "VAPID_SUBJECT เป็น localhost ซึ่ง iPhone ไม่รับ",
+};
+/** `near` puts the status line next to the section the action came from. */
+type Msg = { text: string; tone: "ok" | "bad"; near?: "track" } | null;
 
 const KEY = "nont-admin";
+
+const TRACK_LABEL: Record<TrackingStatus, string> = {
+  learning: "รอเก็บภาพอ้างอิงจากรอบที่อ่านได้ชัด",
+  ok: "ตามไม้วัดได้ปกติ",
+  moved: "กล้องเพิ่งขยับ รอรอบถัดไปยืนยัน",
+  lost: "หาไม้วัดในภาพไม่เจอ ระบบหยุดใช้ค่าที่อ่านได้",
+  covered: "น้ำท่วมช่วงบนของไม้วัด ใช้ตำแหน่งล่าสุดไปก่อน",
+  manual: "ปิดอยู่ อ่านตามเส้นที่ตั้งไว้ด้านล่าง",
+};
+
+/** The calibration drawn where the camera has the gauge now, so the overlay and the form match the snapshot. */
+function liveGauge(d: AdminData): GaugeConfig {
+  const g = applyTransform(d.config.gauge, d.config.autoTrack ? d.state.tracking.transform : IDENTITY);
+  return { ...g, marks: g.marks.map((m) => ({ ...m, y: Math.round(m.y * 10) / 10 })) };
+}
 
 export function AdminPanel() {
   const [password, setPassword] = useState("");
@@ -31,7 +66,7 @@ export function AdminPanel() {
       const d = (await res.json()) as AdminData;
       setData(d);
       setThresholds(d.config.thresholds);
-      setGauge(d.config.gauge);
+      setGauge(liveGauge(d));
       try {
         sessionStorage.setItem(KEY, pw);
       } catch {}
@@ -57,7 +92,11 @@ export function AdminPanel() {
     }
   }, [load]);
 
-  const save = async (body: { thresholds?: Thresholds; gauge?: GaugeConfig }) => {
+  const save = async (
+    body: { thresholds?: Thresholds; gauge?: GaugeConfig; autoTrack?: boolean; resetRefs?: boolean },
+    done = "บันทึกแล้ว มีผลตั้งแต่รอบอ่านค่าถัดไป",
+    near?: "track",
+  ) => {
     setBusy(true);
     setMsg(null);
     try {
@@ -68,10 +107,11 @@ export function AdminPanel() {
       });
       const d = await res.json();
       if (!res.ok) throw new Error(d.error ?? `บันทึกไม่สำเร็จ (${res.status})`);
-      setMsg({ text: "บันทึกแล้ว มีผลตั้งแต่รอบอ่านค่าถัดไป", tone: "ok" });
+      // load() clears the status line, so report after it.
       await load(password);
+      setMsg({ text: done, tone: "ok", near });
     } catch (e) {
-      setMsg({ text: (e as Error).message, tone: "bad" });
+      setMsg({ text: (e as Error).message, tone: "bad", near });
     } finally {
       setBusy(false);
     }
@@ -85,11 +125,13 @@ export function AdminPanel() {
       const d = await res.json();
       if (res.status === 409) throw new Error("กำลังอ่านค่ารอบอื่นอยู่ ลองใหม่ในอีกสักครู่");
       if (!res.ok || !d.ok) throw new Error(`อ่านค่าไม่สำเร็จ: ${d.error ?? d.reading?.reason ?? res.status}`);
-      setMsg({
-        text: `อ่านได้ ${d.reading?.level?.toFixed(2) ?? "-"} ม. (ความมั่นใจ ${d.reading?.confidence}) ส่งเตือน ${d.sent.alerts} ข่าวตามรอบ ${d.sent.digests}`,
-        tone: "ok",
-      });
+      const reason = d.reading?.reason ? ` · ${REASON_LABEL[d.reading.reason] ?? d.reading.reason}` : "";
+      const read = d.reading?.level != null ? `อ่านได้ ${d.reading.level.toFixed(2)} ม. ตามสเกลไม้วัด` : "อ่านค่าไม่ได้";
       await load(password);
+      setMsg({
+        text: `${read} (ความมั่นใจ ${d.reading?.confidence ?? "-"}${reason}) · ส่งเตือน ${d.sent.alerts} · ข่าวตามรอบ ${d.sent.digests} · ถึงผู้ดูแล ${d.sent.system}`,
+        tone: d.reading?.level != null ? "ok" : "bad",
+      });
     } catch (e) {
       setMsg({ text: (e as Error).message, tone: "bad" });
     } finally {
@@ -169,14 +211,22 @@ export function AdminPanel() {
           <li>
             อ่านล่าสุด:{" "}
             {state.lastRead
-              ? `${formatDateTime(state.lastRead.t)} ${state.lastRead.ok ? `${state.lastRead.level?.toFixed(2)} ม. (${state.lastRead.confidence})` : `ไม่สำเร็จ: ${state.lastRead.reason}`}`
+              ? `${formatDateTime(state.lastRead.t)} ${state.lastRead.ok ? `${state.lastRead.level?.toFixed(2)} ม. (${state.lastRead.confidence})` : `ไม่สำเร็จ: ${REASON_LABEL[state.lastRead.reason ?? ""] ?? state.lastRead.reason}`}`
               : "ยังไม่เคยอ่าน"}
           </li>
           <li>อ่านไม่สำเร็จติดกัน: {state.failureStreak} รอบ</li>
           <li>เครื่องที่เปิดการแจ้งเตือน: {data.subscribers}</li>
+          <li>
+            การส่งแจ้งเตือน:{" "}
+            {data.push.problems.length ? (
+              <strong style={{ color: "var(--danger)" }}>{data.push.problems.map((p) => PUSH_PROBLEM[p]).join(" · ")}</strong>
+            ) : (
+              <>พร้อม (ติดต่อ {data.push.subject})</>
+            )}
+          </li>
         </ul>
         <p className="status-line" role="status" data-tone={msg?.tone}>
-          {msg?.text}
+          {msg?.near ? null : msg?.text}
         </p>
       </section>
 
@@ -197,6 +247,73 @@ export function AdminPanel() {
             บันทึกเกณฑ์
           </button>
         </div>
+      </section>
+
+      <section className="section" aria-labelledby="track-title">
+        <div className="section__head">
+          <h2 className="section__title" id="track-title">
+            ตามตำแหน่งไม้วัดอัตโนมัติ
+          </h2>
+          <p className="section__sub">{TRACK_LABEL[data.config.autoTrack ? state.tracking.status : "manual"]}</p>
+        </div>
+        {data.config.autoTrack && (
+          <ul className="facts num">
+            {state.tracking.since > 0 && <li>สถานะนี้ตั้งแต่: {formatDateTime(state.tracking.since)}</li>}
+            <li>
+              เทียบกับเส้นที่ตั้งไว้: {describeMove(IDENTITY, state.tracking.transform) ?? "ตรงกับที่ตั้งไว้"}
+            </li>
+            <li>
+              ภาพตรงกับภาพอ้างอิง: {state.tracking.score === null ? "ยังไม่ได้เทียบ" : state.tracking.score.toFixed(2)}{" "}
+              <span className="quiet">(ต่ำกว่า 0.60 ถือว่าหาไม่เจอ)</span>
+            </li>
+            <li>
+              ภาพอ้างอิง: {data.refs.length} จาก {MAX_REFS} ภาพ
+              {data.refs.length > 0 && (
+                <span className="quiet">
+                  {" "}
+                  (ความสว่าง {data.refs.map((r) => r.meanLuma).join(", ")} · เก็บล่าสุด {formatDateTime(Math.max(...data.refs.map((r) => r.t)))})
+                </span>
+              )}
+            </li>
+          </ul>
+        )}
+        <fieldset className="field" style={{ marginTop: 16 }}>
+          <label className="choices choice">
+            <input
+              type="checkbox"
+              checked={data.config.autoTrack}
+              disabled={busy}
+              onChange={(e) =>
+                save(
+                  { autoTrack: e.target.checked },
+                  e.target.checked ? "เปิดการตามอัตโนมัติแล้ว มีผลรอบอ่านค่าถัดไป" : "ปิดแล้ว ระบบจะอ่านตามเส้นที่ตั้งไว้เท่านั้น",
+                  "track",
+                )
+              }
+            />
+            <span>
+              ปรับตำแหน่งตามกล้องอัตโนมัติ
+              <small>ทุกรอบระบบหาว่ากล้องเลื่อนหรือซูมไปเท่าไร แล้วเลื่อนเส้นขีดตาม ถ้าหาไม่เจอจะหยุดใช้ค่าและแจ้งเครื่องผู้ดูแล</small>
+            </span>
+          </label>
+        </fieldset>
+        <p className="facts quiet" style={{ marginBottom: 12 }}>
+          ภาพอ้างอิงช่วงกลางวันและกลางคืนระบบเก็บเพิ่มเองเมื่อแสงเปลี่ยน กดเก็บใหม่เมื่อมีของวางถาวรข้างไม้วัดหรือเทศบาลเปลี่ยนกล้อง
+        </p>
+        <div className="btn-row">
+          <button
+            type="button"
+            className="btn"
+            disabled={busy || !data.config.autoTrack}
+            onClick={() => save({ resetRefs: true }, "ลบภาพอ้างอิงแล้ว ระบบจะเก็บใหม่จากรอบที่อ่านได้ชัดรอบถัดไป", "track")}
+          >
+            เก็บภาพอ้างอิงใหม่
+          </button>
+        </div>
+        <p className="status-line" role="status" data-tone={msg?.tone}>
+          {msg?.near === "track" ? msg.text : null}
+        </p>
+        <AdminDevice password={password} />
       </section>
 
       <section className="section">
@@ -229,7 +346,8 @@ export function AdminPanel() {
           )}
         </div>
         <p className="facts quiet" style={{ marginTop: 12 }}>
-          เส้นสีฟ้าคือขีดอ้างอิงแต่ละ 10 ซม. ถ้าเลขหลักเมตรผิดทั้งไม้ ใช้ปุ่มเลื่อนสเกล ถ้าเส้นไม่ตรงขีดในภาพ แก้ค่าแถวด้านล่าง
+          เส้นสีฟ้าคือขีดอ้างอิงแต่ละ 10 ซม. วาดตามตำแหน่งที่ระบบตามกล้องได้ล่าสุด ถ้าเลขหลักเมตรผิดทั้งไม้ ใช้ปุ่มเลื่อนสเกล
+          ถ้าเส้นไม่ตรงขีดในภาพ แก้ค่าแถวด้านล่าง เมื่อบันทึก ระบบจะเริ่มตามกล้องใหม่จากเส้นชุดนี้
         </p>
         <div className="btn-row" style={{ marginTop: 12 }}>
           <button type="button" className="btn" onClick={() => shiftMeters(1)}>
@@ -287,11 +405,96 @@ export function AdminPanel() {
           <button type="button" className="btn" onClick={() => save({ gauge })} disabled={busy}>
             บันทึกตำแหน่งไม้วัด
           </button>
-          <button type="button" className="btn btn--quiet" onClick={() => setGauge(data.config.gauge)}>
+          <button type="button" className="btn btn--quiet" onClick={() => setGauge(liveGauge(data))}>
             ยกเลิกการแก้
           </button>
         </div>
       </section>
+    </div>
+  );
+}
+
+type DevicePhase = "checking" | "unsupported" | "off" | "on" | "working";
+
+/** Lets the admin's own phone receive camera and tracking notices. */
+function AdminDevice({ password }: { password: string }) {
+  const [phase, setPhase] = useState<DevicePhase>("checking");
+  const [note, setNote] = useState<Msg>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
+        if (!cancelled) setPhase("unsupported");
+        return;
+      }
+      try {
+        const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
+        const sub = await reg.pushManager.getSubscription();
+        if (!sub) return void (cancelled || setPhase("off"));
+        const res = await fetch("/api/push/me", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ endpoint: sub.endpoint }),
+        });
+        const d = (await res.json()) as { admin?: boolean };
+        if (!cancelled) setPhase(d.admin ? "on" : "off");
+      } catch {
+        if (!cancelled) setPhase("off");
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const toggle = async () => {
+    const on = phase !== "on";
+    setPhase("working");
+    setNote(null);
+    try {
+      if (on && (await Notification.requestPermission()) !== "granted") {
+        throw new Error("เบราว์เซอร์ยังไม่อนุญาตการแจ้งเตือนของเว็บนี้");
+      }
+      const { sub, replaced } = await pushSubscription();
+      const res = await fetch("/api/admin/notify", {
+        method: "POST",
+        headers: { "content-type": "application/json", "x-admin-password": password },
+        body: JSON.stringify({ subscription: sub.toJSON(), on, previousEndpoint: replaced ?? undefined }),
+      });
+      if (!res.ok) throw new Error(`บันทึกไม่สำเร็จ (${res.status})`);
+      const { created } = (await res.json()) as { created?: boolean };
+      setPhase(on ? "on" : "off");
+      setNote({
+        text: on
+          ? `เครื่องนี้จะได้รับแจ้งเมื่อกล้องขยับ หาไม้วัดไม่เจอ หรืออ่านค่าไม่ได้ 1 ชั่วโมง${created ? " และได้ข่าวระดับน้ำ 07:00 น. กับการเตือนระดับอันตรายแบบค่าเริ่มต้น ปรับได้ที่หน้าแรก" : ""}`
+          : "เครื่องนี้หยุดรับแจ้งเตือนผู้ดูแลแล้ว",
+        tone: "ok",
+      });
+    } catch (e) {
+      setPhase(on ? "off" : "on");
+      setNote({ text: (e as Error).message, tone: "bad" });
+    }
+  };
+
+  if (phase === "unsupported") {
+    return (
+      <p className="notice" style={{ marginTop: 16 }}>
+        เบราว์เซอร์นี้รับการแจ้งเตือนไม่ได้ ถ้าเป็น iPhone ให้เพิ่มเว็บลงหน้าจอโฮมแล้วเปิดหน้านี้จากไอคอน
+      </p>
+    );
+  }
+
+  return (
+    <div style={{ marginTop: 24 }}>
+      <div className="btn-row">
+        <button type="button" className="btn" onClick={toggle} disabled={phase === "checking" || phase === "working"} aria-pressed={phase === "on"}>
+          {phase === "on" ? "หยุดรับแจ้งเตือนผู้ดูแลบนเครื่องนี้" : "รับแจ้งเตือนผู้ดูแลบนเครื่องนี้"}
+        </button>
+      </div>
+      <p className="status-line" role="status" data-tone={note?.tone}>
+        {note?.text ?? (phase === "on" ? "เครื่องนี้รับแจ้งเตือนผู้ดูแลอยู่" : null)}
+      </p>
     </div>
   );
 }

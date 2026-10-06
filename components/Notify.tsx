@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import type { AlertPreference } from "@/lib/alerts";
-import { cmBetween } from "@/lib/format";
+import { OFFSET_CHOICES, personalThresholds, type AlertPreference } from "@/lib/alerts";
+import { STATUS_LABEL, cmBetween, formatOffset, thresholdGap } from "@/lib/format";
+import { externalBrowserUrl, type InAppBrowser } from "@/lib/inapp";
 import type { DigestEvery, DigestPref } from "@/lib/schedule";
 import { BellIcon } from "./icons";
 import type { Prefs, PushApi } from "./usePush";
@@ -23,15 +24,91 @@ function digestSummary(d: DigestPref) {
   return `ข่าวระดับน้ำ${EVERY_LABEL[d.every]}`;
 }
 
-function alertSummary(a: AlertPreference) {
+function alertSummary(a: AlertPreference, offsetCm: number) {
   if (a === "off") return "ไม่รับการเตือนภัย";
-  return a === "watch" ? "เตือนทันทีตั้งแต่ระดับเฝ้าระวัง" : "เตือนทันทีเมื่อถึงระดับอันตราย";
+  const what = a === "watch" ? "เตือนทันทีตั้งแต่ระดับเฝ้าระวัง" : "เตือนทันทีเมื่อถึงระดับอันตราย";
+  return offsetCm ? `${what} (${formatOffset(offsetCm)})` : what;
+}
+
+/** How far the water is from the next point this device will be alerted at. */
+function distanceToMine(level: number, prefs: Prefs, watch: number, danger: number) {
+  const mine = personalThresholds({ watch, danger, hysteresis: 0, repeatStep: 0 }, prefs.offsetCm);
+  const gap =
+    prefs.alerts === "danger" && level < mine.danger
+      ? { cm: Math.max(1, Math.round((mine.danger - level) * 100)), target: "danger" as const, over: false }
+      : thresholdGap(level, mine);
+  if (gap.over) return `ตอนนี้น้ำสูงกว่าจุดเตือนอันตรายของคุณ ${gap.cm} ซม.`;
+  return `ตอนนี้อีก ${gap.cm} ซม. ถึงจุดเตือน${STATUS_LABEL[gap.target]}ของคุณ`;
 }
 
 function Message({ push }: { push: PushApi }) {
   return (
     <p className="status-line" role="status" data-tone={push.message?.tone}>
       {push.message?.text}
+    </p>
+  );
+}
+
+const APP_NAME: Record<InAppBrowser, string> = { line: "LINE", facebook: "Facebook", instagram: "Instagram", other: "แอปนี้" };
+
+/** Opened from a chat app: get the visitor into the phone's own browser, where push works. */
+function InAppHelp({ push }: { push: PushApi }) {
+  const { ios, inApp } = push.platform;
+  const [copied, setCopied] = useState<"ok" | "bad" | null>(null);
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(window.location.href);
+      setCopied("ok");
+    } catch {
+      setCopied("bad");
+    }
+  };
+
+  return (
+    <div className="notice">
+      <strong>
+        {APP_NAME[inApp as InAppBrowser]} เปิดหน้านี้ในเบราว์เซอร์ของแอป ซึ่งรับการแจ้งเตือนจากเว็บไม่ได้
+      </strong>
+      <p style={{ marginTop: 8 }}>
+        {ios
+          ? "เปิดหน้านี้ใน Safari ก่อน แล้วเพิ่มลงหน้าจอโฮมและกดเปิดการแจ้งเตือนจากไอคอนนั้น"
+          : "เปิดหน้านี้ใน Chrome หรือเบราว์เซอร์หลักของเครื่องก่อน แล้วกดเปิดการแจ้งเตือนที่นั่น"}
+      </p>
+      {inApp === "line" && (
+        <button
+          type="button"
+          className="btn btn--primary"
+          style={{ marginTop: 12 }}
+          onClick={() => window.location.assign(externalBrowserUrl(window.location.href))}
+        >
+          {ios ? "เปิดใน Safari" : "เปิดในเบราว์เซอร์ของเครื่อง"}
+        </button>
+      )}
+      <ol className="steps">
+        <li>{inApp === "line" ? "ถ้าปุ่มไม่ทำงาน แตะปุ่มเมนูหรือปุ่มแชร์ที่มุมจอ" : "แตะปุ่มเมนูหรือปุ่มแชร์ที่มุมจอ"}</li>
+        <li>เลือก {ios ? "เปิดใน Safari" : "เปิดในเบราว์เซอร์"}</li>
+      </ol>
+      <div className="btn-row" style={{ marginTop: 12 }}>
+        <button type="button" className="btn" onClick={copy}>
+          คัดลอกลิงก์
+        </button>
+      </div>
+      <p className="status-line" role="status" data-tone={copied === "bad" ? "bad" : undefined}>
+        {copied === "ok" && `คัดลอกแล้ว วางในแถบที่อยู่ของ ${ios ? "Safari" : "เบราว์เซอร์"} ได้เลย`}
+        {copied === "bad" && "คัดลอกไม่ได้ในแอปนี้ ใช้ปุ่มเมนูของแอปแทน"}
+      </p>
+    </div>
+  );
+}
+
+/** iPhone lets no web app ring through a Focus such as Do Not Disturb or Sleep. */
+function FocusNote() {
+  return (
+    <p className="notice" data-tone="warn" style={{ marginBottom: 24 }}>
+      <strong>iPhone: การเตือนจะไม่ดังระหว่างโหมดโฟกัส</strong> เช่น ห้ามรบกวน หรือ นอนหลับ เพราะ iPhone
+      ไม่ยอมให้เว็บส่งการแจ้งเตือนที่ดังทะลุโหมดเหล่านี้ ถ้าต้องการให้การเตือนภัยดังตอนกลางคืน ให้เพิ่มแอป
+      น้ำท่าน้ำนนท์ ในรายการแอปที่อนุญาต: การตั้งค่า &gt; โฟกัส &gt; เลือกโหมดที่ใช้ &gt; แอป
     </p>
   );
 }
@@ -46,13 +123,15 @@ export function NotifyCta({ push }: { push: PushApi }) {
         <p className="facts" style={{ display: "flex", gap: 8, alignItems: "flex-start", margin: 0 }}>
           <BellIcon />
           <span>
-            <strong>แจ้งเตือนเปิดอยู่:</strong> {digestSummary(prefs.digest)} · {alertSummary(prefs.alerts)}{" "}
+            <strong>แจ้งเตือนเปิดอยู่:</strong> {digestSummary(prefs.digest)} · {alertSummary(prefs.alerts, prefs.offsetCm)}{" "}
             <a href="#notify">ปรับการแจ้งเตือน</a>
           </span>
         </p>
       </div>
     );
   }
+
+  if (phase === "in-app" && push.platform.inApp) return <InAppHelp push={push} />;
 
   if (phase === "ios-install") {
     return (
@@ -112,11 +191,14 @@ export function NotifySettings({
   push,
   watch,
   danger,
+  latestLevel,
   provisional,
 }: {
   push: PushApi;
   watch: number;
   danger: number;
+  /** Latest reading on the gauge scale, used only to say how far the chosen point is. */
+  latestLevel: number | null;
   provisional?: boolean;
 }) {
   const mark = provisional ? " (เกณฑ์ชั่วคราว)" : "";
@@ -199,7 +281,41 @@ export function NotifySettings({
             </span>
           </label>
         </div>
+        {prefs.alerts !== "off" && (
+          <>
+            <label className="inline-select">
+              <span>จุดเตือนของเครื่องนี้</span>
+              <select value={prefs.offsetCm} onChange={(e) => set({ offsetCm: Number(e.target.value) })}>
+                <optgroup label="เตือนก่อนน้ำถึงเกณฑ์">
+                  {OFFSET_CHOICES.filter((o) => o < 0).map((o) => (
+                    <option key={o} value={o}>
+                      {formatOffset(o)}
+                    </option>
+                  ))}
+                </optgroup>
+                <option value={0}>{formatOffset(0)}</option>
+                <optgroup label="เตือนเมื่อน้ำเกินเกณฑ์ไปแล้ว">
+                  {OFFSET_CHOICES.filter((o) => o > 0).map((o) => (
+                    <option key={o} value={o}>
+                      {formatOffset(o)}
+                    </option>
+                  ))}
+                </optgroup>
+              </select>
+            </label>
+            <p className="field-note">
+              บ้านหรือร้านที่พื้นต่ำกว่าท่าน้ำ เลือกให้เตือนก่อนถึงเกณฑ์ ถ้ายกพื้นสูง เลือกให้เตือนเมื่อเกินเกณฑ์
+            </p>
+            {latestLevel !== null && (
+              <p className="field-note num" data-live="">
+                {distanceToMine(latestLevel, prefs, watch, danger)}
+              </p>
+            )}
+          </>
+        )}
       </fieldset>
+
+      {push.platform.ios && prefs.alerts !== "off" && <FocusNote />}
 
       <fieldset className="field">
         <legend>ช่วงเวลาไม่รบกวน</legend>

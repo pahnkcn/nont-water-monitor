@@ -149,4 +149,5 @@ export const KEYS = {
   config: "config",
   alertLog: "alerts:log",
   tickLock: "lock:tick",
+  gaugeRefs: "gauge:refs",
 } as const;

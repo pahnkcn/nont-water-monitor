@@ -1,21 +1,9 @@
-import { execFileSync } from "node:child_process";
 import { readdirSync } from "node:fs";
 import path from "node:path";
-import ffmpegPath from "ffmpeg-static";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_GAUGE_CONFIG, type GaugeConfig } from "@/lib/gauge-config";
 import { detectWaterline, readGauge, yToLevel, type RGBFrame } from "@/lib/gauge";
-
-const FIXTURES = path.join(__dirname, "fixtures");
-
-function loadFrame(file: string): RGBFrame {
-  const data = execFileSync(
-    ffmpegPath as string,
-    ["-hide_banner", "-loglevel", "error", "-i", file, "-f", "rawvideo", "-pix_fmt", "rgb24", "pipe:1"],
-    { maxBuffer: 1 << 24 },
-  );
-  return { width: 800, height: 600, data: new Uint8Array(data) };
-}
+import { FIXTURES, loadFrame } from "./frames";
 
 /** Plain frame: grey wall, white gauge strip with dark bars down to `waterY`, brown water below. */
 function syntheticFrame(waterY: number, opts: { pipeAt?: number; dark?: boolean } = {}): RGBFrame {
@@ -71,6 +59,20 @@ describe("detectWaterline on synthetic frames", () => {
   it("does not mistake a blue pipe across the gauge for water", () => {
     const res = detectWaterline(syntheticFrame(330, { pipeAt: 280 }), DEFAULT_GAUGE_CONFIG);
     expect(Math.abs((res.y as number) - 330)).toBeLessThanOrEqual(2);
+  });
+
+  it("still reads a flood that covers most of the always-dry rows", () => {
+    // baseline rows are 20-150; water at 80 is gauge level ~2.7 m.
+    const r = readGauge([syntheticFrame(80), syntheticFrame(81), syntheticFrame(80)], DEFAULT_GAUGE_CONFIG);
+    expect(r.ok).toBe(true);
+    expect(Math.abs((r.y as number) - 80)).toBeLessThanOrEqual(2);
+  });
+
+  it("refuses a waterline so high that no baseline row is left to show the gauge is still in view", () => {
+    // A camera that turned to a dark wall looks the same: a few bright rows, then "water".
+    const r = readGauge([syntheticFrame(28), syntheticFrame(28), syntheticFrame(28)], DEFAULT_GAUGE_CONFIG);
+    expect(r.ok).toBe(false);
+    expect(r.reason).toBe("gauge-not-visible");
   });
 
   it("reports water above the top of the gauge", () => {

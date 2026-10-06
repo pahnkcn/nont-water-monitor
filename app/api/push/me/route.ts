@@ -7,7 +7,7 @@ export async function POST(req: Request) {
   const sub = await getSubscriber(subscriberId(body.endpoint));
   if (!sub) return Response.json({ subscribed: false }, { headers: { "cache-control": "no-store" } });
   return Response.json(
-    { subscribed: true, digest: sub.digest, alerts: sub.alerts },
+    { subscribed: true, digest: sub.digest, alerts: sub.alerts, offsetCm: sub.offsetCm ?? 0, admin: Boolean(sub.admin) },
     { headers: { "cache-control": "no-store" } },
   );
 }

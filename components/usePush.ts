@@ -2,12 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import type { AlertPreference } from "@/lib/alerts";
+import { inAppBrowser, type InAppBrowser } from "@/lib/inapp";
 import type { DigestPref } from "@/lib/schedule";
 
-export type Prefs = { digest: DigestPref; alerts: AlertPreference };
+/** `offsetCm` is the personal alert point against the site thresholds (OFFSET_CHOICES). */
+export type Prefs = { digest: DigestPref; alerts: AlertPreference; offsetCm: number };
+
+export type Platform = { ios: boolean; inApp: InAppBrowser | null };
 
 export type PushPhase =
   | "checking"
+  | "in-app" // opened inside LINE, Facebook and the like: move to the phone's own browser first
   | "unsupported" // browser has no web push
   | "ios-install" // iPhone/iPad Safari: push works only from the Home Screen app
   | "denied" // user blocked notifications for this site
@@ -20,6 +25,29 @@ function urlBase64ToUint8Array(base64: string) {
   const padding = "=".repeat((4 - (base64.length % 4)) % 4);
   const raw = atob((base64 + padding).replace(/-/g, "+").replace(/_/g, "/"));
   return Uint8Array.from(raw, (c) => c.charCodeAt(0));
+}
+
+function toBase64Url(buf: ArrayBuffer) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf))).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/**
+ * This browser's push subscription for the site's current VAPID key. One made with an older key
+ * is replaced, because the push service rejects every message sent to it after the keys change.
+ * Needs permission granted. `replaced` is the old endpoint, so the server can carry its settings over.
+ */
+export async function pushSubscription(): Promise<{ sub: PushSubscription; replaced: string | null }> {
+  const reg = await navigator.serviceWorker.ready;
+  const keyRes = await fetch("/api/push/key");
+  if (!keyRes.ok) throw new Error("ระบบแจ้งเตือนของเว็บยังไม่ได้ตั้งค่า");
+  const { key } = (await keyRes.json()) as { key: string };
+  const existing = await reg.pushManager.getSubscription();
+  const existingKey = existing?.options.applicationServerKey;
+  // Browsers that do not report the key get the benefit of the doubt.
+  if (existing && (!existingKey || toBase64Url(existingKey) === key)) return { sub: existing, replaced: null };
+  if (existing) await existing.unsubscribe();
+  const sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) });
+  return { sub, replaced: existing?.endpoint ?? null };
 }
 
 function isIOS() {
@@ -38,6 +66,7 @@ async function post<T>(url: string, body: unknown): Promise<{ ok: boolean; statu
 
 export function usePush() {
   const [phase, setPhase] = useState<PushPhase>("checking");
+  const [platform, setPlatform] = useState<Platform>({ ios: false, inApp: null });
   const [prefs, setPrefs] = useState<Prefs | null>(null);
   const [endpoint, setEndpoint] = useState<string | null>(null);
   const [message, setMessage] = useState<{ text: string; tone: "ok" | "bad" } | null>(null);
@@ -45,25 +74,43 @@ export function usePush() {
   useEffect(() => {
     let cancelled = false;
     (async () => {
+      const here: Platform = { ios: isIOS(), inApp: inAppBrowser(navigator.userAgent) };
+      setPlatform(here);
+      if (here.inApp) return setPhase("in-app");
+      // Arrived from LINE's "open in browser" link: drop its flag from the address bar.
+      const url = new URL(window.location.href);
+      if (url.searchParams.has("openExternalBrowser")) {
+        url.searchParams.delete("openExternalBrowser");
+        window.history.replaceState(null, "", url.href);
+      }
       if (!("serviceWorker" in navigator) || !("PushManager" in window) || !("Notification" in window)) {
         if (!cancelled) setPhase(isIOS() && !isStandalone() ? "ios-install" : "unsupported");
         return;
       }
       try {
         const reg = await navigator.serviceWorker.register("/sw.js", { scope: "/", updateViaCache: "none" });
-        const sub = await reg.pushManager.getSubscription();
+        const found = await reg.pushManager.getSubscription();
         if (cancelled) return;
         if (Notification.permission === "denied") return setPhase("denied");
-        if (!sub) return setPhase("off");
-        const res = await post<{ subscribed: boolean } & Partial<Prefs>>("/api/push/me", { endpoint: sub.endpoint });
+        if (!found) return setPhase("off");
+        // Swap a subscription made with old VAPID keys for a working one; permission is already granted.
+        const { sub, replaced } =
+          Notification.permission === "granted" ? await pushSubscription() : { sub: found, replaced: null };
         if (cancelled) return;
-        if (res.ok && res.data.subscribed && res.data.digest && res.data.alerts) {
+        const res = replaced
+          ? null
+          : await post<{ subscribed: boolean } & Partial<Prefs>>("/api/push/me", { endpoint: sub.endpoint });
+        if (cancelled) return;
+        if (res?.ok && res.data.subscribed && res.data.digest && res.data.alerts) {
           setEndpoint(sub.endpoint);
-          setPrefs({ digest: res.data.digest, alerts: res.data.alerts });
+          setPrefs({ digest: res.data.digest, alerts: res.data.alerts, offsetCm: res.data.offsetCm ?? 0 });
           setPhase("on");
         } else {
-          // The server forgot this device (expired or removed); register it again silently.
-          const again = await post<Prefs>("/api/push/subscribe", { subscription: sub.toJSON() });
+          // New subscription, or the server forgot this device: register it, keeping the old settings if any.
+          const again = await post<Prefs>("/api/push/subscribe", {
+            subscription: sub.toJSON(),
+            previousEndpoint: replaced ?? undefined,
+          });
           if (cancelled) return;
           if (again.ok) {
             setEndpoint(sub.endpoint);
@@ -90,17 +137,14 @@ export function usePush() {
         if (permission === "default") setMessage({ text: "ยังไม่ได้กดอนุญาต ลองกดปุ่มอีกครั้ง", tone: "bad" });
         return;
       }
-      const keyRes = await fetch("/api/push/key");
-      if (!keyRes.ok) throw new Error("ระบบแจ้งเตือนของเว็บยังไม่ได้ตั้งค่า");
-      const { key } = (await keyRes.json()) as { key: string };
-      const reg = await navigator.serviceWorker.ready;
-      const sub =
-        (await reg.pushManager.getSubscription()) ??
-        (await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: urlBase64ToUint8Array(key) }));
-      const res = await post<Prefs & { error?: string }>("/api/push/subscribe", { subscription: sub.toJSON() });
+      const { sub, replaced } = await pushSubscription();
+      const res = await post<Prefs & { error?: string }>("/api/push/subscribe", {
+        subscription: sub.toJSON(),
+        previousEndpoint: replaced ?? undefined,
+      });
       if (!res.ok) throw new Error(res.status === 503 ? "ผู้รับการแจ้งเตือนเต็มแล้ว" : "บันทึกการสมัครไม่สำเร็จ");
       setEndpoint(sub.endpoint);
-      setPrefs({ digest: res.data.digest, alerts: res.data.alerts });
+      setPrefs({ digest: res.data.digest, alerts: res.data.alerts, offsetCm: res.data.offsetCm ?? 0 });
       setPhase("on");
       setMessage({ text: "เปิดการแจ้งเตือนแล้ว", tone: "ok" });
     } catch (e) {
@@ -163,7 +207,7 @@ export function usePush() {
     }
   }, []);
 
-  return { phase, prefs, message, subscribe, update, sendTest, unsubscribe };
+  return { phase, platform, prefs, message, subscribe, update, sendTest, unsubscribe };
 }
 
 export type PushApi = ReturnType<typeof usePush>;

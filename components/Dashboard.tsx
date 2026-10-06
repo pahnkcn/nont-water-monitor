@@ -123,16 +123,30 @@ export function Dashboard({ initial }: { initial: PublicState }) {
             {state.camera === "waiting" && (
               <p className="notice">ระบบอ่านค่าจากกล้องทุก 10 นาที ค่าแรกจะขึ้นที่นี่หลังการอ่านครั้งแรก</p>
             )}
-            {state.camera === "stale" && (
+            {state.tracking === "lost" ? (
               <p className="notice" data-tone="bad" role="status">
-                อ่านค่าจากกล้องไม่ได้
-                {state.failingSince ? `ตั้งแต่ ${formatTime(state.failingSince)}` : ""} ตัวเลขด้านบนคือค่าล่าสุดที่อ่านได้
+                หาไม้วัดในภาพไม่เจอ กล้องอาจหันไปทางอื่นหรือมีของบัง ระบบหยุดใช้ค่าจากกล้องจนกว่าจะเห็นไม้วัดอีกครั้ง
+                ตัวเลขด้านบนคือค่าล่าสุดที่เชื่อถือได้
               </p>
+            ) : (
+              state.camera === "stale" && (
+                <p className="notice" data-tone="bad" role="status">
+                  อ่านค่าจากกล้องไม่ได้
+                  {state.failingSince ? `ตั้งแต่ ${formatTime(state.failingSince)}` : ""} ตัวเลขด้านบนคือค่าล่าสุดที่อ่านได้
+                </p>
+              )
             )}
-            {latest?.confidence === "low" && state.camera === "ok" && (
+            {state.tracking === "moved" && state.camera === "ok" ? (
               <p className="notice" data-tone="warn">
-                ภาพรอบนี้ไม่ชัด ค่านี้อาจคลาดเคลื่อน ระบบจะยืนยันอีกครั้งในรอบถัดไป
+                กล้องเพิ่งขยับ ระบบปรับตำแหน่งไม้วัดตามแล้ว ค่ารอบนี้จะใช้เตือนเมื่อรอบถัดไปยืนยันตรงกัน
               </p>
+            ) : (
+              latest?.confidence === "low" &&
+              state.camera === "ok" && (
+                <p className="notice" data-tone="warn">
+                  ภาพรอบนี้ไม่ชัด ค่านี้อาจคลาดเคลื่อน ระบบจะยืนยันอีกครั้งในรอบถัดไป
+                </p>
+              )
             )}
           </div>
 
@@ -177,6 +191,7 @@ export function Dashboard({ initial }: { initial: PublicState }) {
               push={push}
               watch={thresholds.watch}
               danger={thresholds.danger}
+              latestLevel={latest?.level ?? null}
               provisional={state.thresholdsArePlaceholders}
             />
           </section>

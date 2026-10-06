@@ -25,7 +25,15 @@ export type GaugeReading = {
   confidence: "high" | "low";
   aboveTop: boolean;
   belowRange: boolean;
-  reason?: "dark" | "gauge-not-visible" | "frames-disagree" | "weak-edge" | "no-frames";
+  reason?:
+    | "dark"
+    | "gauge-not-visible"
+    | "frames-disagree"
+    | "weak-edge"
+    | "no-frames"
+    // set by lib/autotrack.ts
+    | "camera-moved"
+    | "gauge-lost";
   frames: WaterlineResult[];
 };
 
@@ -33,15 +41,17 @@ const WET_RUN = 5; // consecutive wet rows (~2.5 cm) before we call it water
 const WET_WHITE_MAX = 0.3;
 const OCCLUDER_MIN = 0.4;
 const BASELINE_MIN = 0.45;
-const DARK_LUMA = 25;
+const BASELINE_CLEARANCE = 5; // rows just above the water are often wet
+const BASELINE_MIN_ROWS = 10;
+export const DARK_LUMA = 25;
 const MAX_SPREAD_PX = 6; // ~3 cm between frames
 const MIN_CONTRAST = 0.35;
 
-function luma(r: number, g: number, b: number) {
+export function luma(r: number, g: number, b: number) {
   return 0.299 * r + 0.587 * g + 0.114 * b;
 }
 
-function axisX(cfg: GaugeConfig, y: number) {
+export function axisX(cfg: GaugeConfig, y: number) {
   const { top, bottom } = cfg.axis;
   return top.x + ((y - top.y) * (bottom.x - top.x)) / (bottom.y - top.y);
 }
@@ -89,7 +99,7 @@ function whiteThreshold(frame: RGBFrame, cfg: GaugeConfig) {
   return Math.max(90, 0.7 * percentile(lumas, 0.9));
 }
 
-function frameMeanLuma(frame: RGBFrame) {
+export function frameMeanLuma(frame: RGBFrame) {
   let sum = 0;
   let n = 0;
   for (let i = 0; i < frame.data.length; i += 3 * 97) {
@@ -109,13 +119,18 @@ export function detectWaterline(frame: RGBFrame, cfg: GaugeConfig): WaterlineRes
   const rows: RowStats[] = [];
   for (let y = y0; y <= y1; y++) rows.push(rowStats(frame, cfg, y, whiteLuma));
 
-  let baseSum = 0;
-  let baseN = 0;
-  for (let y = cfg.baseline.y0; y <= cfg.baseline.y1; y++) {
-    baseSum += rows[y - y0]?.white ?? 0;
-    baseN++;
-  }
-  const baselineOk = baseN > 0 && baseSum / baseN >= BASELINE_MIN;
+  /** Does the face look like a gauge on the baseline rows above `wetFrom`? */
+  const baselineAbove = (wetFrom: number) => {
+    let sum = 0;
+    let n = 0;
+    for (let y = cfg.baseline.y0; y <= Math.min(cfg.baseline.y1, wetFrom - BASELINE_CLEARANCE); y++) {
+      sum += rows[y - y0]?.white ?? 0;
+      n++;
+    }
+    // Too few rows left is not proof of a gauge: a camera turned to a dark wall looks the same
+    // (a few bright rows, then "water"). Water over the very top is reported as aboveTop instead.
+    return n >= BASELINE_MIN_ROWS && sum / n >= BASELINE_MIN;
+  };
 
   // Average each row with its neighbours: single dark tick rows and specks of glare should not decide the edge.
   const smooth = rows.map((row, k) => {
@@ -147,9 +162,10 @@ export function detectWaterline(frame: RGBFrame, cfg: GaugeConfig): WaterlineRes
     }
   }
 
-  if (found === -1) return { ...empty, y: y1, belowRange: true, dark: false, baselineOk };
+  if (found === -1) return { ...empty, y: y1, belowRange: true, dark: false, baselineOk: baselineAbove(Infinity) };
 
   const y = y0 + found;
+  const baselineOk = baselineAbove(y);
   const mean = (from: number, to: number) => {
     let s = 0;
     let n = 0;
