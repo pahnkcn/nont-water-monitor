@@ -307,9 +307,6 @@ export function NotifySettings({
                 </optgroup>
               </select>
             </label>
-            <p className="field-note">
-              บ้านหรือร้านที่พื้นต่ำกว่าท่าน้ำ เลือกให้เตือนก่อนถึงเกณฑ์ ถ้ายกพื้นสูง เลือกให้เตือนเมื่อเกินเกณฑ์
-            </p>
             {latestLevel !== null && (
               <p className="field-note num" data-live="">
                 {distanceToMine(latestLevel, latestEstimate, prefs, watch, danger)}

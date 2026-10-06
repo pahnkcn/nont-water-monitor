@@ -28,7 +28,6 @@ export function AlertLog({ events }: { events: LoggedEvent[] }) {
         <h2 className="section__title" id={titleId}>
           บันทึกการเตือน
         </h2>
-        <p className="section__sub">ไม่ลบ แค่ขีดทับเมื่อพ้นระดับ</p>
       </div>
       {rows.length === 0 ? (
         <p className="facts quiet">ยังไม่มีการเตือน ตั้งแต่เริ่มบันทึกน้ำยังไม่ถึงเกณฑ์เฝ้าระวัง</p>
