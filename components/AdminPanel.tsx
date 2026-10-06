@@ -136,7 +136,7 @@ export function AdminPanel() {
             : `อ่านได้${d.reading.estimate === "approx" ? "ประมาณ" : ""} ${d.reading.level.toFixed(2)} ม. ตามสเกลไม้วัด`;
       await load(password);
       setMsg({
-        text: `${read} (ความมั่นใจ ${d.reading?.confidence ?? "-"}${reason}) · ส่งเตือน ${d.sent.alerts} · ข่าวตามรอบ ${d.sent.digests} · ถึงผู้ดูแล ${d.sent.system}`,
+        text: `${read} (ความมั่นใจ ${d.reading?.confidence ?? "-"}${reason}) · ส่งเตือน ${d.sent.alerts} · เตือนซ้ำ ${d.sent.reminders} · ข่าวตามรอบ ${d.sent.digests} · ถึงผู้ดูแล ${d.sent.system}`,
         tone: d.reading?.level != null ? "ok" : "bad",
       });
     } catch (e) {

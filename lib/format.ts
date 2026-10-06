@@ -95,6 +95,11 @@ export function formatDateTime(t: number) {
   return `${DAY.format(t)} ${formatTime(t)}`;
 }
 
+/** "ทุก 10 นาที" / "ทุก 2 ชั่วโมง". */
+export function formatEvery(minutes: number) {
+  return minutes % 60 ? `ทุก ${minutes} นาที` : `ทุก ${minutes / 60} ชั่วโมง`;
+}
+
 export function formatTrend(cmPerHour: number | null) {
   if (cmPerHour === null) return null;
   if (Math.abs(cmPerHour) < 2) return "ทรงตัว";

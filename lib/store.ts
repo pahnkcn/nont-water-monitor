@@ -4,6 +4,7 @@ import { INITIAL_ALERT_STATE, OFFSET_CHOICES, initialPersonalState, personalThre
 import { INITIAL_TRACKING, type TrackingState } from "./autotrack";
 import { KEYS, kv } from "./kv";
 import type { PushTarget } from "./push";
+import { DEFAULT_REPEAT, REPEAT_CHOICES, type RepeatPref } from "./remind";
 import { DEFAULT_DIGEST, type DigestPref } from "./schedule";
 import type { Estimate, StoredReading } from "./summary";
 import { MAX_SUSPECTS, type LevelAt } from "./jump";
@@ -180,6 +181,10 @@ export type Subscriber = {
   alertState?: AlertState;
   /** Gets camera and tracking notices meant for whoever runs the site. */
   admin?: boolean;
+  /** Reminders while the water stays over this device's alert point. Missing means DEFAULT_REPEAT. */
+  repeat?: RepeatPref;
+  /** When this device was last sent an alert or a reminder. */
+  lastAlertAt?: number;
 };
 
 export function subscriberId(endpoint: string) {
@@ -222,6 +227,12 @@ export function sanitizeOffset(v: unknown, fallback = 0): number {
   return (OFFSET_CHOICES as readonly unknown[]).includes(v) ? (v as number) : fallback;
 }
 
+export function sanitizeRepeat(r: Partial<RepeatPref> | undefined, fallback: RepeatPref = DEFAULT_REPEAT): RepeatPref {
+  const pick = (level: keyof RepeatPref) =>
+    (REPEAT_CHOICES[level] as readonly unknown[]).includes(r?.[level]) ? (r![level] as number) : fallback[level];
+  return { watch: pick("watch"), danger: pick("danger") };
+}
+
 export async function getSubscriber(id: string) {
   return kv().hget<Subscriber>(KEYS.subs, id);
 }
@@ -238,8 +249,8 @@ export async function saveSubscribers(subs: Subscriber[]) {
   await kv().hset(KEYS.subs, Object.fromEntries(subs.map((s) => [s.id, s])));
 }
 
-/** What a round changes on a device: its state at its own alert point, and when its last update went out. */
-export type RoundUpdate = { id: string; offsetCm: number; alertState?: AlertState; lastDigestAt?: number };
+/** What a round changes on a device: its state at its own alert point, and when its last update and alert went out. */
+export type RoundUpdate = { id: string; offsetCm: number; alertState?: AlertState; lastDigestAt?: number; lastAlertAt?: number };
 
 /**
  * Apply a round's results to the records as they are now, not as they were when the round began.
@@ -255,6 +266,7 @@ export async function applyRoundUpdates(updates: RoundUpdate[]) {
     if (!sub) continue;
     const next = { ...sub };
     if (u.lastDigestAt !== undefined) next.lastDigestAt = Math.max(sub.lastDigestAt, u.lastDigestAt);
+    if (u.lastAlertAt !== undefined) next.lastAlertAt = Math.max(sub.lastAlertAt ?? 0, u.lastAlertAt);
     if (u.alertState && (sub.offsetCm ?? 0) === u.offsetCm) next.alertState = u.alertState;
     merged.push(next);
   }

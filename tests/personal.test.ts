@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_THRESHOLDS as TH,
   INITIAL_ALERT_STATE,
-  firstOffsetAhead,
   initialPersonalState,
   personalThresholds,
   pointAhead,
@@ -11,7 +10,7 @@ import {
   type AlertState,
 } from "@/lib/alerts";
 import { alertMessage } from "@/lib/messages";
-import { sanitizeOffset } from "@/lib/store";
+import { addReading, getSubscriber, sanitizeOffset, subscriberId } from "@/lib/store";
 
 // Site thresholds: watch 2.20, danger 2.50, hysteresis 5 cm.
 
@@ -66,8 +65,8 @@ describe("personal alert point", () => {
   });
 });
 
-describe("picking an alert point the water has not reached", () => {
-  it("allows only points above the current level", () => {
+describe("whether the water has passed an alert point", () => {
+  it("counts only points above the current level as ahead", () => {
     // Water at 2.05: watch -20 (2.00) is passed, watch -10 (2.10) is still ahead.
     expect(pointAhead(2.05, TH, "watch", -20)).toBe(false);
     expect(pointAhead(2.05, TH, "watch", -10)).toBe(true);
@@ -79,18 +78,32 @@ describe("picking an alert point the water has not reached", () => {
     expect(pointAhead(2.19, TH, "watch", 0)).toBe(true);
   });
 
-  it("allows anything with no reading or with alerts off", () => {
+  it("counts everything as ahead with no reading or with alerts off", () => {
     expect(pointAhead(null, TH, "watch", -50)).toBe(true);
     expect(pointAhead(3, TH, "off", -50)).toBe(true);
   });
+});
 
-  it("finds the earliest point still above the water", () => {
-    expect(firstOffsetAhead(1.5, TH, "watch")).toBe(-50);
-    expect(firstOffsetAhead(2.05, TH, "watch")).toBe(-10);
-    expect(firstOffsetAhead(2.3, TH, "danger")).toBe(-10); // 2.40
-    expect(firstOffsetAhead(2.5, TH, "watch")).toBeNull(); // watch +30 is 2.50
-    expect(firstOffsetAhead(2.79, TH, "danger")).toBe(30);
-    expect(firstOffsetAhead(2.8, TH, "danger")).toBeNull();
+describe("picking an alert point the water has already passed", () => {
+  const post = (body: unknown) =>
+    new Request("https://nont.example/x", { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json" } });
+  const subscription = { endpoint: "https://fcm.googleapis.com/fcm/send/passed", keys: { p256dh: "p", auth: "a" } };
+
+  it("is saved as chosen, with the device starting where the water is and no alert", async () => {
+    const subscribe = await import("@/app/api/push/subscribe/route");
+    await addReading({ t: Date.now(), level: 2.3, confidence: "high" });
+    await subscribe.POST(post({ subscription, alerts: "danger" }));
+
+    // Danger 20 cm early is 2.30: the water is there already.
+    const res = await subscribe.POST(post({ subscription, offsetCm: -20 }));
+    expect(res.status).toBe(200);
+    expect((await res.json()).offsetCm).toBe(-20);
+    const saved = await getSubscriber(subscriberId(subscription.endpoint));
+    expect(saved?.alertState?.status).toBe("danger");
+
+    // Switching to watch keeps the point rather than moving it up.
+    const watch = await subscribe.POST(post({ subscription, alerts: "watch" }));
+    expect(await watch.json()).toEqual(expect.objectContaining({ alerts: "watch", offsetCm: -20 }));
   });
 });
 

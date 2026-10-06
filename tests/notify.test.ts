@@ -81,12 +81,15 @@ beforeAll(async () => {
     new Request(`${ORIGIN}/x`, { method: "POST", body: JSON.stringify(body), headers: { "content-type": "application/json", ...headers } });
   const subscription = (who: string) => ({ endpoint: `https://fcm.googleapis.com/fcm/send/${who}`, keys: { p256dh: "p", auth: "a" } });
 
+  const noRepeat = { watch: 0, danger: 0 };
   const devices = [
-    { who: "A", alerts: "watch", digest: { every: "1h", dailyHour: 7, quiet: null } },
-    { who: "B", alerts: "danger", digest: { every: "daily", dailyHour: 7, quiet: { start: 22, end: 6 } } },
+    { who: "A", alerts: "watch", digest: { every: "1h", dailyHour: 7, quiet: null }, repeat: noRepeat },
+    { who: "B", alerts: "danger", digest: { every: "daily", dailyHour: 7, quiet: { start: 22, end: 6 } }, repeat: noRepeat },
     { who: "C", alerts: "off", digest: { every: "3h" } },
     { who: "D", alerts: "watch", digest: { every: "1h", quiet: null } },
-    { who: "E", alerts: "watch", digest: { every: "off" }, offsetCm: -20 },
+    { who: "E", alerts: "watch", digest: { every: "off" }, offsetCm: -20, repeat: noRepeat },
+    // Default reminders: every 30 minutes at watch, every 10 at danger.
+    { who: "R", alerts: "watch", digest: { every: "off" } },
   ];
   for (const d of devices) {
     const res = await subscribe.POST(post({ subscription: subscription(d.who), ...d }));
@@ -170,6 +173,26 @@ describe("a morning of rounds", () => {
     expect(e[0].msg.title).toMatch(/^ใกล้ระดับเฝ้าระวัง: น้ำท่าน้ำนนท์อีก 1\d ซม\.$/);
     expect(e[0].msg.body).toContain("จุดเตือนของคุณ: ก่อนถึงเกณฑ์ 20 ซม.");
     expect(e[1].msg.title).toMatch(/^ใกล้ระดับอันตราย: น้ำท่าน้ำนนท์อีก 1\d ซม\.$/);
+  });
+
+  it("reminds every 30 minutes at watch and every 10 at danger, counting from the last alert", () => {
+    const r = of("R", "alert");
+    const reminder = (s: Sent) => s.msg.body.includes("ปรับหรือปิดได้ในหน้าเว็บ");
+    expect(times(r.filter((s) => !reminder(s)))).toEqual(["07:20", "08:30", "09:00", "09:50", "11:50"]);
+    expect(times(r.filter(reminder))).toEqual([
+      "07:50", "08:20", // watch
+      "08:40", "08:50", "09:10", "09:20", "09:30", "09:40", // danger; 09:00 is a rising alert
+      "10:20", "10:50", "11:20", // watch again, through the camera outage
+    ]);
+    expect(r.filter(reminder).every((s) => s.msg.tag === "alert" && s.msg.urgency === "high")).toBe(true);
+    // 08:20 is still watch for the device, but the unconfirmed reading is over danger.
+    expect(r.find((s) => hhmm(s.at) === "08:20")?.msg.title).toMatch(/^น้ำท่าน้ำนนท์สูงกว่าระดับอันตราย \d ซม\.$/);
+  });
+
+  it("keeps reminding while the camera is down, with the age of the level", () => {
+    const at = (t: string) => of("R", "alert").find((s) => hhmm(s.at) === t)?.msg.body;
+    expect(at("10:20")).toContain("อ่านเมื่อ 10:10 น.");
+    expect(at("10:50")).toContain("กล้องไม่ตอบสนองตั้งแต่ 10:20 น. ค่านี้อ่านเมื่อ 10:10 น.");
   });
 
   it("follows the knocked camera: one held-back round, then normal readings at the new spot", () => {

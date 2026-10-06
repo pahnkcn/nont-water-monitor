@@ -1,7 +1,7 @@
 import type { AlertEvent, Status, Thresholds } from "./alerts";
 import type { TrackingNotice } from "./autotrack";
-import { REASON_LABEL, STATUS_LABEL, cmBetween, describeMove, formatGap, formatOffset, formatTime, formatTrend } from "./format";
-import type { Summary } from "./summary";
+import { REASON_LABEL, STATUS_LABEL, cmBetween, describeMove, formatEvery, formatGap, formatOffset, formatTime, formatTrend } from "./format";
+import type { StoredReading, Summary } from "./summary";
 
 export type PushMessage = {
   title: string;
@@ -26,6 +26,28 @@ export function snapshotImage(snap: { t: number } | null, now: number): string |
   return snap && now - snap.t <= FRESH_PICTURE_MS ? `/api/snapshot?t=${snap.t}` : undefined;
 }
 
+const reachedLimit = (level: number, limit: number) => level >= limit - 0.005;
+
+/**
+ * "อันตราย: น้ำท่าน้ำนนท์เกินเกณฑ์ 12 ซม." once the site threshold is reached, otherwise
+ * "ใกล้ระดับเฝ้าระวัง: น้ำท่าน้ำนนท์อีก 8 ซม." (a personal point below it). `still` words it as a reminder.
+ */
+function levelTitle(status: Status, level: number, th: Thresholds, still = false) {
+  const limit = status === "danger" ? th.danger : th.watch;
+  const cm = cmBetween(level, limit);
+  if (reachedLimit(level, limit)) {
+    return `${still ? "ยังอยู่ระดับ" : ""}${STATUS_LABEL[status]}: น้ำ${PLACE}${cm ? `เกินเกณฑ์ ${cm} ซม.` : "ถึงเกณฑ์แล้ว"}`;
+  }
+  return `${still ? "ยัง" : ""}ใกล้ระดับ${STATUS_LABEL[status]}: น้ำ${PLACE}อีก ${cm} ซม.`;
+}
+
+/** When a level was read, and since when the camera has been silent if that level is old. */
+function readAt(t: number, stale: boolean, lastFailureAt: number | null) {
+  return stale && lastFailureAt
+    ? `กล้องไม่ตอบสนองตั้งแต่ ${formatTime(lastFailureAt)} ค่านี้อ่านเมื่อ ${formatTime(t)}`
+    : `อ่านเมื่อ ${formatTime(t)}`;
+}
+
 /**
  * `e` comes from the subscriber's own alert point (site thresholds moved by `offsetCm`),
  * but every distance in the text is measured against the site thresholds in `th`.
@@ -42,14 +64,10 @@ export function alertMessage(
   const base = { tag: "alert" as const, url: "/", urgency: "high" as const, ttl: 60 * 60, image: opts.snapshotUrl };
   switch (e.kind) {
     case "escalate": {
-      const limit = e.to === "danger" ? th.danger : th.watch;
-      const cm = cmBetween(e.level, limit);
-      const reached = e.level >= limit - 0.005;
+      const reached = reachedLimit(e.level, e.to === "danger" ? th.danger : th.watch);
       return {
         ...base,
-        title: reached
-          ? `${STATUS_LABEL[e.to]}: น้ำ${PLACE}${cm ? `เกินเกณฑ์ ${cm} ซม.` : "ถึงเกณฑ์แล้ว"}`
-          : `ใกล้ระดับ${STATUS_LABEL[e.to]}: น้ำ${PLACE}อีก ${cm} ซม.`,
+        title: levelTitle(e.to, e.level, th),
         body: [reached && e.to === "watch" ? formatGap(e.level, th) : null, mine, trend, at].filter(Boolean).join(" · "),
         requireInteraction: e.to === "danger",
       };
@@ -94,14 +112,48 @@ export function digestMessage(
     formatGap(latest.level, th, latest.estimate),
     formatTrend(summary.trendCmPerHour),
     high ? `สูงสุดวันนี้ ${formatGap(high.level, th, high.estimate)} (${formatTime(high.t)})` : null,
-    opts.stale && opts.lastFailureAt
-      ? `กล้องไม่ตอบสนองตั้งแต่ ${formatTime(opts.lastFailureAt)} ค่านี้อ่านเมื่อ ${formatTime(latest.t)}`
-      : `อ่านเมื่อ ${formatTime(latest.t)}`,
+    readAt(latest.t, opts.stale, opts.lastFailureAt),
   ];
   return {
     ...base,
     title: `น้ำ${PLACE} · ${STATUS_LABEL[status]}`,
     body: parts.filter(Boolean).join(" · "),
+  };
+}
+
+/**
+ * Sent again while a device stays at or over its alert point. `status` is the device's own state;
+ * distances are measured against the site thresholds, as in alertMessage. It replaces the alert
+ * already on the device and expires before the next one is due.
+ */
+export function reminderMessage(
+  status: "watch" | "danger",
+  latest: StoredReading,
+  th: Thresholds,
+  opts: { everyMin: number; trend: number | null; offsetCm?: number; stale: boolean; lastFailureAt: number | null; snapshotUrl?: string },
+): PushMessage {
+  const offsetCm = opts.offsetCm ?? 0;
+  const reached = reachedLimit(latest.level, status === "danger" ? th.danger : th.watch);
+  // A device can sit at watch with the water over danger (a rise not yet confirmed, or a late
+  // alert point); "still at watch" would then understate it, so the title gives the level itself.
+  const overDanger = status === "watch" && reachedLimit(latest.level, th.danger);
+  return {
+    title: overDanger ? `น้ำ${PLACE}${formatGap(latest.level, th, latest.estimate)}` : levelTitle(status, latest.level, th, true),
+    body: [
+      reached && status === "watch" && !overDanger ? formatGap(latest.level, th, latest.estimate) : null,
+      offsetCm ? `จุดเตือนของคุณ: ${formatOffset(offsetCm)}` : null,
+      formatTrend(opts.trend),
+      readAt(latest.t, opts.stale, opts.lastFailureAt),
+      `เตือนซ้ำ${formatEvery(opts.everyMin)} ปรับหรือปิดได้ในหน้าเว็บ`,
+    ]
+      .filter(Boolean)
+      .join(" · "),
+    tag: "alert",
+    url: "/",
+    image: opts.snapshotUrl,
+    requireInteraction: status === "danger",
+    urgency: "high",
+    ttl: opts.everyMin * 60,
   };
 }
 

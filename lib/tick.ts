@@ -5,8 +5,9 @@ import { getConfig, type SiteConfig } from "./config";
 import { DARK_LUMA, frameMeanLuma, readGauge } from "./gauge";
 import { judgeJump, type LevelAt } from "./jump";
 import { KEYS, kv } from "./kv";
-import { alertMessage, digestMessage, snapshotImage, systemMessage, type PushMessage, type SystemNotice } from "./messages";
+import { alertMessage, digestMessage, reminderMessage, snapshotImage, systemMessage, type PushMessage, type SystemNotice } from "./messages";
 import { mapLimit, sendPush } from "./push";
+import { DEFAULT_REPEAT, isReminderDue } from "./remind";
 import { isDigestDue } from "./schedule";
 import {
   addReading,
@@ -45,7 +46,7 @@ export type TickResult = {
   error?: string;
   status?: string;
   events: AlertEvent[];
-  sent: { alerts: number; digests: number; system: number; failed: number; removed: number };
+  sent: { alerts: number; reminders: number; digests: number; system: number; failed: number; removed: number };
   ms: number;
 };
 
@@ -56,7 +57,7 @@ const LIVE: TickDeps = { capture: () => captureFrames(), send: sendPush };
 
 export async function runTick(origin: string, now = Date.now(), deps: TickDeps = LIVE): Promise<TickResult> {
   const started = Date.now();
-  const sent = { alerts: 0, digests: 0, system: 0, failed: 0, removed: 0 };
+  const sent = { alerts: 0, reminders: 0, digests: 0, system: 0, failed: 0, removed: 0 };
   if (!(await kv().setNX(KEYS.tickLock, now, 240))) {
     return { ok: false, skipped: "locked", events: [], sent, ms: 0 };
   }
@@ -210,7 +211,7 @@ async function notify(round: {
   const digest = digestMessage(summary, state.alert.status, thresholds, { lastFailureAt: state.failingSince, stale, snapshotUrl });
   const system = round.notices.map(systemMessage);
 
-  type Job = { sub: Subscriber; msg: PushMessage; kind: "alerts" | "digests" | "system" };
+  type Job = { sub: Subscriber; msg: PushMessage; kind: "alerts" | "reminders" | "digests" | "system" };
   const jobs: Job[] = [];
   const updates = new Map<string, RoundUpdate>();
   const update = (sub: Subscriber, patch: Omit<RoundUpdate, "id" | "offsetCm">) =>
@@ -218,19 +219,42 @@ async function notify(round: {
   for (const sub of subs) {
     const offsetCm = sub.offsetCm ?? 0;
     let mine: AlertEvent[] = [];
+    // A round without a reading leaves the device where it was.
+    let current = sub.alertState ?? round.siteAlertBefore;
     if (round.reading) {
       // Each device has its own alert point, so each runs its own copy of the alert state machine.
-      const before = sub.alertState ?? round.siteAlertBefore;
-      const out = stepAlert(before, round.reading, personalThresholds(thresholds, offsetCm));
+      const out = stepAlert(current, round.reading, personalThresholds(thresholds, offsetCm));
       mine = out.events.filter((e) => wantsEvent(sub.alerts, e));
       if (JSON.stringify(out.state) !== JSON.stringify(sub.alertState)) update(sub, { alertState: out.state });
+      current = out.state;
     }
     for (const e of mine) {
       jobs.push({ sub, kind: "alerts", msg: alertMessage(e, thresholds, { snapshotUrl, trend: summary.trendCmPerHour, offsetCm }) });
     }
+    let reminded = false;
+    if (mine.length) update(sub, { lastAlertAt: now });
+    else if (current.status !== "normal" && summary.latest) {
+      const repeat = sub.repeat ?? DEFAULT_REPEAT;
+      // Counted from the last alert, or from reaching this level without one (a point picked under the water).
+      const lastAlertAt = Math.max(sub.lastAlertAt ?? 0, current.since);
+      if (isReminderDue({ status: current.status, alerts: sub.alerts, repeat, quiet: sub.digest.quiet, lastAlertAt, now })) {
+        // While the camera is down this is the last level read, with its age.
+        const msg = reminderMessage(current.status, summary.latest, thresholds, {
+          everyMin: repeat[current.status],
+          trend: summary.trendCmPerHour,
+          offsetCm,
+          stale,
+          lastFailureAt: state.failingSince,
+          snapshotUrl,
+        });
+        jobs.push({ sub, kind: "reminders", msg });
+        update(sub, { lastAlertAt: now });
+        reminded = true;
+      }
+    }
     if (isDigestDue(sub.digest, sub.lastDigestAt, now)) {
-      // An alert in the same round already carries the level; mark the slot as served.
-      if (!mine.length) jobs.push({ sub, kind: "digests", msg: digest });
+      // An alert or reminder in the same round already carries the level; mark the slot as served.
+      if (!mine.length && !reminded) jobs.push({ sub, kind: "digests", msg: digest });
       update(sub, { lastDigestAt: now });
     }
     if (sub.admin) for (const msg of system) jobs.push({ sub, kind: "system", msg });
