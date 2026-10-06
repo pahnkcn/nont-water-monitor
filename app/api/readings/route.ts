@@ -1,4 +1,6 @@
+import { chartPoint, type ChartPoint } from "@/lib/public-state";
 import { readingsSince } from "@/lib/store";
+import type { StoredReading } from "@/lib/summary";
 
 const HOUR = 60 * 60 * 1000;
 const RANGES = { "24h": { span: 24 * HOUR, bucket: 0 }, "7d": { span: 7 * 24 * HOUR, bucket: HOUR / 2 }, "30d": { span: 30 * 24 * HOUR, bucket: 2 * HOUR } } as const;
@@ -10,18 +12,18 @@ export async function GET(req: Request) {
 
   const now = Date.now();
   const readings = await readingsSince(now - range.span);
-  let points: Array<[number, number]>;
+  let points: ChartPoint[];
   if (!range.bucket) {
-    points = readings.map((r) => [r.t, r.level]);
+    points = readings.map(chartPoint);
   } else {
     // Keep the highest reading in each bucket: the peak is what matters for flooding.
-    const buckets = new Map<number, [number, number]>();
+    const buckets = new Map<number, StoredReading>();
     for (const r of readings) {
       const b = Math.floor(r.t / range.bucket);
       const cur = buckets.get(b);
-      if (!cur || r.level > cur[1]) buckets.set(b, [r.t, r.level]);
+      if (!cur || r.level > cur.level) buckets.set(b, r);
     }
-    points = [...buckets.values()].sort((a, b) => a[0] - b[0]);
+    points = [...buckets.values()].sort((a, b) => a.t - b.t).map(chartPoint);
   }
   return Response.json(
     { range: key, points },

@@ -42,9 +42,14 @@ describe("yToLevel", () => {
     expect(yToLevel(224, marks)).toBeCloseTo(1.95, 2);
   });
 
+  it("uses the labels read off the shaded bottom of the gauge", () => {
+    expect(yToLevel(391, marks)).toBeCloseTo(1.1, 5);
+    expect(yToLevel(445, marks)).toBeCloseTo(0.8, 5);
+  });
+
   it("extrapolates past the last mark using the last segment", () => {
-    // last segment: 331 -> 1.40, 352 -> 1.30, so 21px per 10cm
-    expect(yToLevel(373, marks)).toBeCloseTo(1.2, 2);
+    // last segment: 428 -> 0.90, 445 -> 0.80, so 17px per 10cm
+    expect(yToLevel(462, marks)).toBeCloseTo(0.7, 2);
   });
 });
 
@@ -106,6 +111,30 @@ describe("readGauge", () => {
     expect(r.ok).toBe(false);
   });
 
+  it("reads water just under the main span as an estimate, at the real edge", () => {
+    const r = readGauge([syntheticFrame(450), syntheticFrame(450), syntheticFrame(451)], DEFAULT_GAUGE_CONFIG);
+    expect(r.ok).toBe(true);
+    expect(r.confidence).toBe("high");
+    expect(r.approx).toBe(true);
+    expect(r.belowRange).toBe(false);
+    expect(Math.abs((r.y as number) - 450)).toBeLessThanOrEqual(2);
+  });
+
+  it("puts the line on water that straddles the end of the main span, not where the low zone starts", () => {
+    const r = readGauge([syntheticFrame(417), syntheticFrame(417), syntheticFrame(417)], DEFAULT_GAUGE_CONFIG);
+    expect(r.ok).toBe(true);
+    expect(Math.abs((r.y as number) - 417)).toBeLessThanOrEqual(2);
+  });
+
+  it("marks water under everything it scans as below range, with the last scanned row as the level", () => {
+    const r = readGauge([syntheticFrame(560), syntheticFrame(560), syntheticFrame(560)], DEFAULT_GAUGE_CONFIG);
+    expect(r.ok).toBe(true);
+    expect(r.belowRange).toBe(true);
+    expect(r.approx).toBe(false);
+    expect(r.y).toBeGreaterThan(DEFAULT_GAUGE_CONFIG.axis.bottom.y);
+    expect(r.y).toBeLessThan(560);
+  });
+
   it("follows a recalibrated config", () => {
     const cfg: GaugeConfig = {
       ...DEFAULT_GAUGE_CONFIG,
@@ -133,6 +162,33 @@ describe("real night frames (2026-10-03 23:01-23:02)", () => {
     expect(r.y).toBeLessThanOrEqual(374);
     expect(r.level).toBeGreaterThan(1.17);
     expect(r.level).toBeLessThan(1.27);
+  });
+});
+
+describe("real day frames at low water (2026-10-06)", () => {
+  // The water touches the foot of the gauge, which is in shade and crowded with large black
+  // numbers. The plate (and the yellow post beside it) end at the waterline near row 452.
+  it("finds the waterline at the foot of the gauge at 07:27, as an estimate", () => {
+    const files = readdirSync(FIXTURES)
+      .filter((f) => f.startsWith("day-") && f.endsWith(".png"))
+      .sort()
+      .map((f) => loadFrame(path.join(FIXTURES, f)));
+    const r = readGauge(files, DEFAULT_GAUGE_CONFIG);
+    expect(r.ok).toBe(true);
+    expect(r.confidence).toBe("high");
+    expect(r.approx).toBe(true);
+    expect(r.y).toBeGreaterThanOrEqual(449);
+    expect(r.y).toBeLessThanOrEqual(456);
+    expect(r.level).toBeGreaterThan(0.72);
+    expect(r.level).toBeLessThan(0.81);
+  });
+
+  it("is not fooled by the white cable hanging into the water at 07:56", () => {
+    const r = readGauge([loadFrame(path.join(FIXTURES, "low-0756.png"))], DEFAULT_GAUGE_CONFIG);
+    expect(r.ok).toBe(true);
+    expect(r.approx).toBe(true);
+    expect(r.y).toBeGreaterThanOrEqual(450);
+    expect(r.y).toBeLessThanOrEqual(458);
   });
 });
 

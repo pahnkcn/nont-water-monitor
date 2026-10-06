@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { STATUS_LABEL, formatGap, formatTime, formatTrend, thresholdGap } from "@/lib/format";
+import { STATUS_LABEL, formatGap, formatTime, formatTrend, thresholdGap, toGoWord } from "@/lib/format";
 import type { PublicState } from "@/lib/public-state";
 import { AlertLog } from "./AlertLog";
 import { CameraPanel } from "./CameraPanel";
@@ -58,7 +58,8 @@ export function Dashboard({ initial }: { initial: PublicState }) {
 
   const { latest, status, thresholds } = state;
   const trend = formatTrend(state.trendCmPerHour);
-  const gap = latest ? thresholdGap(latest.level, thresholds) : null;
+  const estimate = latest?.estimate;
+  const gap = latest ? thresholdGap(latest.level, thresholds, estimate) : null;
 
   return (
     <>
@@ -84,13 +85,28 @@ export function Dashboard({ initial }: { initial: PublicState }) {
             {gap ? (
               <div>
                 <p className="level num">
-                  {!gap.over && <span className="level__unit">อีก</span>}
+                  {!gap.over && <span className="level__unit">{toGoWord(gap.estimate)}</span>}
                   <span className="level__value" data-long={gap.cm >= 100 || undefined}>
                     {gap.cm}
                   </span>
                   <span className="level__unit">ซม.</span>
                 </p>
                 <p className="level__to">{gap.over ? "สูงกว่าระดับอันตราย" : `ถึงระดับ${STATUS_LABEL[gap.target]}`}</p>
+                {gap.estimate && (
+                  <p className="notice" data-tone="warn">
+                    {gap.estimate === "approx" ? (
+                      <>
+                        <strong>ค่าประมาณ</strong> น้ำอยู่ช่วงล่างของไม้วัดซึ่งอยู่ในเงาและมีตัวเลขบัง
+                        ตัวเลขนี้และเส้นผิวน้ำบนภาพกล้องอาจคลาดเคลื่อนได้ราว 5 ซม.
+                      </>
+                    ) : (
+                      <>
+                        <strong>ไม่ใช่ค่าจริง</strong> น้ำลดต่ำกว่าช่วงที่ระบบอ่านจากไม้วัดได้ ระยะจริงมากกว่าตัวเลขนี้
+                        และเส้นบนภาพกล้องคือแถวล่างสุดที่อ่าน ไม่ใช่ผิวน้ำ
+                      </>
+                    )}
+                  </p>
+                )}
               </div>
             ) : (
               <p className="level">
@@ -105,17 +121,21 @@ export function Dashboard({ initial }: { initial: PublicState }) {
                     อยู่ในระดับ{STATUS_LABEL[status]}ตั้งแต่ <span className="nowrap">{formatTime(state.statusSince)}</span>
                   </li>
                 )}
-                <li>{trend ?? "อัตราขึ้นลง: รอข้อมูลครบ 1 ชั่วโมง"}</li>
+                <li>
+                  {estimate === "below"
+                    ? "อัตราขึ้นลง: วัดไม่ได้ขณะน้ำต่ำกว่าช่วงที่อ่าน"
+                    : (trend ?? "อัตราขึ้นลง: รอข้อมูลครบ 1 ชั่วโมง")}
+                </li>
                 {state.todayHigh && (
                   <li className="num">
-                    สูงสุดวันนี้ {formatGap(state.todayHigh.level, thresholds)}{" "}
+                    สูงสุดวันนี้ {formatGap(state.todayHigh.level, thresholds, state.todayHigh.estimate)}{" "}
                     <span className="nowrap">({formatTime(state.todayHigh.t)})</span>
                   </li>
                 )}
                 <li className="quiet num">
                   อ่านจากกล้องเมื่อ <span className="nowrap">{formatTime(latest.t)}</span>
                   {clock !== null && <span className="nowrap"> ({minutesAgo(latest.t, clock)})</span>} ·{" "}
-                  <span className="nowrap">{latest.confidence === "high" ? "ภาพชัด" : "ภาพไม่ชัด"}</span>
+                  <span className="nowrap">{estimate ? "ค่าประมาณ" : latest.confidence === "high" ? "ภาพชัด" : "ภาพไม่ชัด"}</span>
                 </li>
               </ul>
             )}
@@ -153,6 +173,7 @@ export function Dashboard({ initial }: { initial: PublicState }) {
           <div className="lead__louvre">
             <Louvre
               level={latest?.level ?? null}
+              estimate={estimate}
               watch={thresholds.watch}
               danger={thresholds.danger}
               provisional={state.thresholdsArePlaceholders}
@@ -180,7 +201,11 @@ export function Dashboard({ initial }: { initial: PublicState }) {
             provisional={state.thresholdsArePlaceholders}
             now={state.now}
           />
-          <CameraPanel snapshotAt={state.snapshot?.t ?? null} lineY={state.snapshot?.y ?? null} />
+          <CameraPanel
+            snapshotAt={state.snapshot?.t ?? null}
+            lineY={state.snapshot?.y ?? null}
+            estimate={state.snapshot?.estimate}
+          />
           <section className="section" id="notify" aria-labelledby="notify-title">
             <div className="section__head">
               <h2 className="section__title" id="notify-title">
@@ -192,6 +217,7 @@ export function Dashboard({ initial }: { initial: PublicState }) {
               watch={thresholds.watch}
               danger={thresholds.danger}
               latestLevel={latest?.level ?? null}
+              latestEstimate={estimate}
               provisional={state.thresholdsArePlaceholders}
             />
           </section>

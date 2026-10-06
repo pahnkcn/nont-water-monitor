@@ -83,9 +83,9 @@ export function digestMessage(
   }
   const high = summary.todayHigh;
   const parts = [
-    formatGap(latest.level, th),
+    formatGap(latest.level, th, latest.estimate),
     formatTrend(summary.trendCmPerHour),
-    high ? `สูงสุดวันนี้ ${formatGap(high.level, th)} (${formatTime(high.t)})` : null,
+    high ? `สูงสุดวันนี้ ${formatGap(high.level, th, high.estimate)} (${formatTime(high.t)})` : null,
     opts.stale && opts.lastFailureAt
       ? `กล้องไม่ตอบสนองตั้งแต่ ${formatTime(opts.lastFailureAt)} ค่านี้อ่านเมื่อ ${formatTime(latest.t)}`
       : `อ่านเมื่อ ${formatTime(latest.t)}`,
@@ -102,7 +102,7 @@ export function testMessage(summary: Summary, status: Status, th: Thresholds): P
   return {
     title: "การแจ้งเตือนใช้งานได้",
     body: latest
-      ? `ตอนนี้น้ำ${PLACE} ${STATUS_LABEL[status]} · ${formatGap(latest.level, th)} · อ่านเมื่อ ${formatTime(latest.t)}`
+      ? `ตอนนี้น้ำ${PLACE} ${STATUS_LABEL[status]} · ${formatGap(latest.level, th, latest.estimate)} · อ่านเมื่อ ${formatTime(latest.t)}`
       : "เครื่องนี้จะได้รับข่าวระดับน้ำตามรอบที่เลือก",
     tag: "test",
     url: "/",

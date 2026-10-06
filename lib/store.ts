@@ -5,7 +5,7 @@ import { INITIAL_TRACKING, type TrackingState } from "./autotrack";
 import { KEYS, kv } from "./kv";
 import type { PushTarget } from "./push";
 import { DEFAULT_DIGEST, type DigestPref } from "./schedule";
-import type { StoredReading } from "./summary";
+import type { Estimate, StoredReading } from "./summary";
 import type { GaugeReference } from "./track";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -37,6 +37,7 @@ export type LastRead = {
   level?: number;
   confidence?: "high" | "low";
   y?: number | null;
+  estimate?: Estimate;
 };
 
 export type SiteState = {
@@ -69,14 +70,15 @@ export async function setState(s: SiteState) {
 
 // ---------- snapshot ----------
 
-export type Snapshot = { t: number; jpegBase64: string; y: number | null };
+/** `y` is the waterline row, or with estimate "below" the last row scanned (the water is lower). */
+export type Snapshot = { t: number; jpegBase64: string; y: number | null; estimate?: Estimate };
 
 export type SnapshotMeta = Omit<Snapshot, "jpegBase64">;
 
 export async function setSnapshot(s: Snapshot) {
   await kv().set(KEYS.snapshot, s);
   // Small copy for the dashboard so it never has to pull the image out of Redis.
-  await kv().set(KEYS.snapshotMeta, { t: s.t, y: s.y } satisfies SnapshotMeta);
+  await kv().set(KEYS.snapshotMeta, { t: s.t, y: s.y, estimate: s.estimate } satisfies SnapshotMeta);
 }
 
 export async function getSnapshotMeta(): Promise<SnapshotMeta | null> {

@@ -1,5 +1,6 @@
 import { useId } from "react";
 import { cmBetween, formatGap } from "@/lib/format";
+import type { Estimate } from "@/lib/summary";
 
 // The signature gauge: a louvred shutter like the awnings of the old provincial hall.
 // One blade is 10 cm on the staff gauge. Above the water the blades stand open, with the
@@ -9,6 +10,8 @@ import { cmBetween, formatGap } from "@/lib/format";
 
 type Props = {
   level: number | null;
+  /** How the level was estimated, when it was not a clean read. */
+  estimate?: Estimate;
   watch: number;
   danger: number;
   /** Thresholds not yet confirmed by an admin; rail names get an asterisk. */
@@ -31,7 +34,7 @@ export function louvreRange(level: number | null, danger: number) {
   return { bottom, top };
 }
 
-export function Louvre({ level, watch, danger, provisional }: Props) {
+export function Louvre({ level, estimate, watch, danger, provisional }: Props) {
   const uid = useId().replace(/:/g, "");
   const { bottom, top } = louvreRange(level, danger);
   const slats = Math.round((top - bottom) * 10);
@@ -52,7 +55,7 @@ export function Louvre({ level, watch, danger, provisional }: Props) {
   ].filter((r) => r.value > bottom && r.value < top); // danger listed last so it paints on top
 
   const description =
-    (level === null ? "ไม้วัดจำลอง ยังไม่มีค่าระดับน้ำ" : `ไม้วัดจำลอง ${formatGap(level, { watch, danger })}`) +
+    (level === null ? "ไม้วัดจำลอง ยังไม่มีค่าระดับน้ำ" : `ไม้วัดจำลอง ${formatGap(level, { watch, danger }, estimate)}`) +
     ` ระดับอันตรายสูงกว่าระดับเฝ้าระวัง ${cmBetween(danger, watch)} ซม. ช่องละ 10 ซม.` +
     (provisional ? " เกณฑ์ยังเป็นค่าชั่วคราว" : "");
 
@@ -133,7 +136,8 @@ export function Louvre({ level, watch, danger, provisional }: Props) {
             d={`M${FRAME_X + FRAME_W + 4} ${waterY} l6 -11 h${W - FRAME_X - FRAME_W - 10} v22 h-${W - FRAME_X - FRAME_W - 10} z`}
           />
           <text className="marker-text" x={FRAME_X + FRAME_W + 12} y={waterY + 5}>
-            ตอนนี้
+            {/* "ประมาณ" overflows the flag; the reading and its notice already say it is an estimate. */}
+            {estimate === "below" ? "ต่ำกว่า" : "ตอนนี้"}
           </text>
         </g>
       )}

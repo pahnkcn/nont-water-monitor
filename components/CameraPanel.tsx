@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useRef, useState } from "react";
 import { formatTime } from "@/lib/format";
+import type { Estimate } from "@/lib/summary";
 import { PlayIcon, StopIcon } from "./icons";
 
 const STREAM = "https://stream.firsttech.co.th/live/nakornnont.stream/playlist.m3u8";
@@ -13,9 +14,13 @@ type Props = {
   snapshotAt: number | null;
   /** Row where the reader found the waterline in that snapshot. */
   lineY: number | null;
+  /** "below": no water on any row scanned, so lineY is the last of them and the water is under it. */
+  estimate?: Estimate;
 };
 
-export function CameraPanel({ snapshotAt, lineY }: Props) {
+export function CameraPanel({ snapshotAt, lineY, estimate }: Props) {
+  const below = estimate === "below";
+  const approx = estimate === "approx";
   const [live, setLive] = useState(false);
   const [liveState, setLiveState] = useState<"loading" | "playing" | "error">("loading");
   const [imgError, setImgError] = useState(false);
@@ -107,7 +112,7 @@ export function CameraPanel({ snapshotAt, lineY }: Props) {
             />
             {linePct !== null && (
               <div className="camera__line" style={{ top: `${linePct}%` }}>
-                <span>ผิวน้ำที่ระบบอ่านได้</span>
+                <span>{below ? "ผิวน้ำต่ำกว่าเส้นนี้" : approx ? "ผิวน้ำโดยประมาณ · อาจคลาดเคลื่อน" : "ผิวน้ำที่ระบบอ่านได้"}</span>
               </div>
             )}
           </>
@@ -118,13 +123,35 @@ export function CameraPanel({ snapshotAt, lineY }: Props) {
         )}
       </div>
 
+      {!live && snapshotAt && !imgError && linePct !== null && estimate && (
+        <p className="notice" data-tone="warn">
+          {approx ? (
+            <>
+              <strong>เส้นนี้เป็นค่าประมาณ</strong> ช่วงล่างของไม้วัดอยู่ในเงาและมีตัวเลขบัง ตำแหน่งเส้นอาจคลาดจากผิวน้ำจริงเล็กน้อย
+              กดดูภาพสดเพื่อเทียบได้
+            </>
+          ) : (
+            <>
+              <strong>เส้นนี้ไม่ใช่ผิวน้ำ</strong> ระบบไม่พบผิวน้ำจนถึงแถวล่างสุดที่อ่าน น้ำอยู่ต่ำกว่าเส้นนี้
+            </>
+          )}
+        </p>
+      )}
+
       <div className="camera-meta">
         <button type="button" className="btn" onClick={() => setLive((v) => !v)} aria-pressed={live}>
           {live ? <StopIcon /> : <PlayIcon />}
           {live ? "หยุดภาพสด" : "ดูภาพสด"}
         </button>
         <p>
-          {live ? "ใช้อินเทอร์เน็ตราว 2 MB ต่อนาที" : "เส้นประสีเหลืองคือผิวน้ำที่ระบบตรวจพบบนไม้วัด"} ·{" "}
+          {live
+            ? "ใช้อินเทอร์เน็ตราว 2 MB ต่อนาที"
+            : below
+              ? "เส้นประสีเหลืองคือแถวล่างสุดที่ระบบอ่านบนไม้วัด ผิวน้ำอยู่ต่ำกว่านั้น"
+              : approx
+                ? "เส้นประสีเหลืองคือผิวน้ำโดยประมาณที่ระบบตรวจพบบนไม้วัด"
+                : "เส้นประสีเหลืองคือผิวน้ำที่ระบบตรวจพบบนไม้วัด"}{" "}
+          ·{" "}
           <a href={SOURCE} target="_blank" rel="noopener noreferrer">
             เว็บกล้องของเทศบาล
           </a>
