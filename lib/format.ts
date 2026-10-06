@@ -18,6 +18,7 @@ export const REASON_LABEL: Record<string, string> = {
   "frames-disagree": "ภาพแต่ละเฟรมไม่ตรงกัน",
   "weak-edge": "ขอบผิวน้ำไม่ชัด",
   "camera-moved": "กล้องเพิ่งขยับ รอยืนยัน",
+  jump: "ต่างจากรอบก่อนเกินกว่าน้ำจะขึ้นลงได้ พักไว้รอยืนยัน",
   unreadable: "อ่านค่าไม่ได้",
 };
 

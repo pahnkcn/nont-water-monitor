@@ -2,33 +2,8 @@ import { readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_GAUGE_CONFIG, type GaugeConfig } from "@/lib/gauge-config";
-import { detectWaterline, levelToY, readGauge, yToLevel, type RGBFrame } from "@/lib/gauge";
-import { FIXTURES, loadFrame } from "./frames";
-
-/** Plain frame: grey wall, white gauge strip with dark bars down to `waterY`, brown water below. */
-function syntheticFrame(waterY: number, opts: { pipeAt?: number; dark?: boolean } = {}): RGBFrame {
-  const width = 800;
-  const height = 600;
-  const data = new Uint8Array(width * height * 3);
-  const cfg = DEFAULT_GAUGE_CONFIG;
-  const slope = (cfg.axis.bottom.x - cfg.axis.top.x) / (cfg.axis.bottom.y - cfg.axis.top.y);
-  for (let y = 0; y < height; y++) {
-    const cx = cfg.axis.top.x + (y - cfg.axis.top.y) * slope;
-    for (let x = 0; x < width; x++) {
-      let rgb: [number, number, number] = [120, 120, 115];
-      const onGauge = Math.abs(x - cx) <= 16;
-      if (y >= waterY) rgb = [118, 96, 60];
-      else if (onGauge) rgb = y % 10 < 2 && x > cx ? [30, 30, 60] : [235, 235, 232];
-      if (opts.pipeAt !== undefined && y >= opts.pipeAt && y < opts.pipeAt + 10) rgb = [40, 120, 220];
-      if (opts.dark) rgb = [6, 6, 6];
-      const i = (y * width + x) * 3;
-      data[i] = rgb[0];
-      data[i + 1] = rgb[1];
-      data[i + 2] = rgb[2];
-    }
-  }
-  return { width, height, data };
-}
+import { detectWaterline, levelToY, readGauge, yToLevel } from "@/lib/gauge";
+import { FIXTURES, loadFrame, syntheticFrame } from "./frames";
 
 describe("yToLevel", () => {
   const marks = DEFAULT_GAUGE_CONFIG.marks;

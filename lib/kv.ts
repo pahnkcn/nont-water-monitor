@@ -150,4 +150,6 @@ export const KEYS = {
   alertLog: "alerts:log",
   tickLock: "lock:tick",
   gaugeRefs: "gauge:refs",
+  suspects: "suspects",
+  suspectImages: "suspects:img",
 } as const;

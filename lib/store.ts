@@ -6,6 +6,7 @@ import { KEYS, kv } from "./kv";
 import type { PushTarget } from "./push";
 import { DEFAULT_DIGEST, type DigestPref } from "./schedule";
 import type { Estimate, StoredReading } from "./summary";
+import { MAX_SUSPECTS, type LevelAt } from "./jump";
 import type { GaugeReference } from "./track";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -49,6 +50,10 @@ export type SiteState = {
   failureStreak: number;
   /** Where the camera has the gauge now, relative to the saved calibration. */
   tracking: TrackingState;
+  /** The last level taken into the history; the next round is judged against it (lib/jump.ts). */
+  lastGood: LevelAt | null;
+  /** A round held back as out of the river's reach, waiting for the next round to agree. */
+  held: LevelAt | null;
 };
 
 export const INITIAL_SITE_STATE: SiteState = {
@@ -58,6 +63,8 @@ export const INITIAL_SITE_STATE: SiteState = {
   failingSince: null,
   failureStreak: 0,
   tracking: INITIAL_TRACKING,
+  lastGood: null,
+  held: null,
 };
 
 export async function getState(): Promise<SiteState> {
@@ -111,6 +118,38 @@ export async function clearGaugeRefs() {
 export async function resetTracking() {
   await clearGaugeRefs();
   await setState({ ...(await getState()), tracking: INITIAL_TRACKING });
+}
+
+// ---------- suspicious rounds ----------
+
+/** A round held back as a jump or read with low confidence, kept with its picture for /admin. */
+export type Suspect = {
+  t: number;
+  level: number;
+  y: number | null;
+  confidence: "high" | "low";
+  /** "jump" when held back as out of the river's reach, otherwise why the reader was unsure. */
+  reason?: string;
+  estimate?: Estimate;
+  /** The accepted level the round was judged against. */
+  lastLevel: number | null;
+};
+
+/** The pictures go in a second list kept in step with the first, so listing the rounds stays small. */
+export async function addSuspect(s: Suspect, jpegBase64: string) {
+  await kv().lpushTrim(KEYS.suspects, s, MAX_SUSPECTS);
+  await kv().lpushTrim(KEYS.suspectImages, { t: s.t, jpegBase64 }, MAX_SUSPECTS);
+}
+
+/** Newest first. */
+export async function getSuspects(): Promise<Suspect[]> {
+  return kv().lrange<Suspect>(KEYS.suspects, 0, -1);
+}
+
+/** The picture at position `i` of the list, if it is still the one taken at `t`. */
+export async function getSuspectImage(i: number, t: number): Promise<string | null> {
+  const [img] = await kv().lrange<{ t: number; jpegBase64: string }>(KEYS.suspectImages, i, i);
+  return img?.t === t ? img.jpegBase64 : null;
 }
 
 // ---------- alert log ----------

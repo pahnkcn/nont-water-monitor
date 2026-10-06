@@ -156,7 +156,12 @@ export function Dashboard({ initial }: { initial: PublicState }) {
                 </p>
               )
             )}
-            {state.tracking === "moved" && state.camera === "ok" ? (
+            {state.lastReason === "jump" && state.camera === "ok" ? (
+              <p className="notice" data-tone="warn">
+                ค่ารอบล่าสุดต่างจากรอบก่อนเกินกว่าน้ำจะขึ้นลงได้ อาจมีของบังไม้วัด ระบบยังไม่ใช้ค่านั้น
+                ตัวเลขด้านบนคือค่าล่าสุดที่เชื่อถือได้ และจะยืนยันอีกครั้งในรอบถัดไป
+              </p>
+            ) : state.tracking === "moved" && state.camera === "ok" ? (
               <p className="notice" data-tone="warn">
                 กล้องเพิ่งขยับ ระบบปรับตำแหน่งไม้วัดตามแล้ว ค่ารอบนี้จะใช้เตือนเมื่อรอบถัดไปยืนยันตรงกัน
               </p>

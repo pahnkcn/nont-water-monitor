@@ -925,6 +925,27 @@ details.table-view[open] .disclosure {
   font-weight: 600;
 }
 
+/* Suspicious rounds in /admin: the action sits right of the two text lines, the picture opens below. */
+.suspects li {
+  grid-template-columns: 1fr auto;
+  align-items: center;
+}
+
+.suspects .what,
+.suspects .when {
+  grid-column: 1;
+}
+
+.suspects .btn {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+}
+
+.suspects .camera {
+  grid-column: 1 / -1;
+  margin-top: var(--space-2);
+}
+
 /* ---------- notification settings ---------- */
 
 .field {

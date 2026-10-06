@@ -3,16 +3,17 @@ import { isAdminRequest, readJson } from "@/lib/auth";
 import { getConfig, saveConfig, validateGauge, validateThresholds } from "@/lib/config";
 import type { GaugeConfig } from "@/lib/gauge-config";
 import { pushConfig } from "@/lib/push";
-import { clearGaugeRefs, getGaugeRefs, getSnapshotMeta, getState, subscriberCount } from "@/lib/store";
+import { clearGaugeRefs, getGaugeRefs, getSnapshotMeta, getState, getSuspects, subscriberCount } from "@/lib/store";
 
 export async function GET(req: Request) {
   if (!isAdminRequest(req)) return Response.json({ error: "unauthorized" }, { status: 401 });
-  const [config, state, snap, subs, refs] = await Promise.all([
+  const [config, state, snap, subs, refs, suspects] = await Promise.all([
     getConfig(),
     getState(),
     getSnapshotMeta(),
     subscriberCount(),
     getGaugeRefs(),
+    getSuspects(),
   ]);
   return Response.json(
     {
@@ -22,6 +23,7 @@ export async function GET(req: Request) {
       subscribers: subs,
       refs: refs.map((r) => ({ t: r.t, meanLuma: r.meanLuma })),
       push: pushConfig(),
+      suspects,
     },
     { headers: { "cache-control": "no-store" } },
   );
