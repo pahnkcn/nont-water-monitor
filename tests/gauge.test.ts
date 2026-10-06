@@ -2,7 +2,7 @@ import { readdirSync } from "node:fs";
 import path from "node:path";
 import { describe, expect, it } from "vitest";
 import { DEFAULT_GAUGE_CONFIG, type GaugeConfig } from "@/lib/gauge-config";
-import { detectWaterline, readGauge, yToLevel, type RGBFrame } from "@/lib/gauge";
+import { detectWaterline, levelToY, readGauge, yToLevel, type RGBFrame } from "@/lib/gauge";
 import { FIXTURES, loadFrame } from "./frames";
 
 /** Plain frame: grey wall, white gauge strip with dark bars down to `waterY`, brown water below. */
@@ -50,6 +50,26 @@ describe("yToLevel", () => {
   it("extrapolates past the last mark using the last segment", () => {
     // last segment: 428 -> 0.90, 445 -> 0.80, so 17px per 10cm
     expect(yToLevel(462, marks)).toBeCloseTo(0.7, 2);
+  });
+});
+
+describe("levelToY", () => {
+  const marks = DEFAULT_GAUGE_CONFIG.marks;
+
+  it("returns the mark row exactly on a mark", () => {
+    expect(levelToY(2.0, marks)).toBeCloseTo(214, 5);
+    expect(levelToY(1.3, marks)).toBeCloseTo(352, 5);
+  });
+
+  it("interpolates between marks", () => {
+    // 2.0 at row 214, 1.9 at row 234
+    expect(levelToY(1.95, marks)).toBeCloseTo(224, 5);
+  });
+
+  it("extrapolates past both ends using the end segments", () => {
+    // top segment: 2.9 at 29, 2.8 at 50; bottom segment: 0.9 at 428, 0.8 at 445
+    expect(levelToY(3.0, marks)).toBeCloseTo(8, 5);
+    expect(levelToY(0.7, marks)).toBeCloseTo(462, 5);
   });
 });
 

@@ -291,6 +291,9 @@ This is an SVG shutter. One blade is a 14px pitch and equals 10 cm. The range ru
 ### Level Chart
 The chart repeats the gauge's geometry. A 2px river line runs over a river-soft area fill with 4px river dots ringed in ground. Threshold rails are drawn as 8px balustrade bands, the grid uses slat-edge hairlines, and the scrub tooltip is ink. Below the chart are a rail legend and a disclosure table of readings with hairline rows.
 
+### Camera Snapshot
+The latest snapshot carries three 2px dashed lines across the photo: the waterline in fixed yellow (#ffd84d), and the watch and danger levels in the night state colours (night-watch, night-danger) whatever the theme, since the photo does not change with it. Each line has a label on a 72% black tag: the waterline's at the left, the rails' at the right with their triangle or octagon icon and the name only, no metre values. Danger's tag sits above its line and watch's below; near an edge a tag is pushed back inside the photo, and watch's never climbs over danger's. Tags paint over every line. Provisional thresholds get an asterisk. Rails are drawn only on the snapshot, where the camera position is known, never on the live video, and not at all while the gauge is lost.
+
 ### Alert Log
 Each row is a hairline-ruled grid of the state icon in its state colour, what happened, and when. Entries are never deleted. A cleared entry is struck through with a 2px ink-2 line, and a 600-weight "cleared" line is added beneath it.
 
