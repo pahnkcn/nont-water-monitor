@@ -234,6 +234,19 @@ export function yToLevel(y: number, marks: GaugeMark[]): number {
   return a.level + ((y - a.y) * (b.level - a.level)) / (b.y - a.y);
 }
 
+/** The inverse of yToLevel: the image row where a gauge level sits, extrapolating at both ends. */
+export function levelToY(level: number, marks: GaugeMark[]): number {
+  if (marks.length < 2) throw new Error("need at least two calibration marks");
+  const m = [...marks].sort((a, b) => b.level - a.level);
+  let i = 0;
+  if (level >= m[0].level) i = 0;
+  else if (level <= m[m.length - 1].level) i = m.length - 2;
+  else while (i < m.length - 2 && level < m[i + 1].level) i++;
+  const a = m[i];
+  const b = m[i + 1];
+  return a.y + ((level - a.level) * (b.y - a.y)) / (b.level - a.level);
+}
+
 function median(values: number[]) {
   const s = [...values].sort((a, b) => a - b);
   const mid = Math.floor(s.length / 2);

@@ -205,6 +205,8 @@ export function Dashboard({ initial }: { initial: PublicState }) {
             snapshotAt={state.snapshot?.t ?? null}
             lineY={state.snapshot?.y ?? null}
             estimate={state.snapshot?.estimate}
+            thresholdRows={state.thresholdRows}
+            provisional={state.thresholdsArePlaceholders}
           />
           <section className="section" id="notify" aria-labelledby="notify-title">
             <div className="section__head">

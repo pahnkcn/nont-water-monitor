@@ -787,6 +787,12 @@ details.table-view[open] .disclosure {
   background: var(--ink);
   aspect-ratio: 4 / 3;
   overflow: hidden;
+  /* The photo looks the same in either theme, so its rails always take the lifted night colours. */
+  --cam-watch: #e08a55;
+  --cam-danger: #f0645b;
+  /* --danger-y and --watch-y come from the page, only for rails inside the frame. */
+  --tag-h: 26px;
+  --danger-tag: clamp(4px, calc(var(--danger-y) - var(--tag-h) - 4px), calc(100% - 2 * var(--tag-h) - 8px));
 }
 
 .camera img,
@@ -816,6 +822,53 @@ details.table-view[open] .disclosure {
   color: #ffffff;
   font-size: 0.8125rem;
   font-weight: 600;
+}
+
+.camera [data-level="watch"] {
+  --rail: var(--cam-watch);
+}
+
+.camera [data-level="danger"] {
+  --rail: var(--cam-danger);
+}
+
+.camera__line[data-level] {
+  border-top-color: var(--rail);
+}
+
+/* Rail tags sit right of the gauge, away from the waterline label. They are placed against the
+   frame, not their line, so the edge never cuts one off: danger's rides above its line and
+   watch's hangs below, each pushed back inside the photo, and watch's never climbs over danger's. */
+.camera__tag {
+  position: absolute;
+  right: var(--space-2);
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-1);
+  height: var(--tag-h);
+  padding: 0 var(--space-2);
+  background: rgb(0 0 0 / 0.72);
+  color: #ffffff;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  pointer-events: none;
+}
+
+.camera__tag[data-level="danger"] {
+  top: var(--danger-tag);
+}
+
+.camera__tag[data-level="watch"] {
+  top: clamp(
+    max(4px, calc(var(--danger-tag, -100%) + var(--tag-h) + 4px)),
+    calc(var(--watch-y) + 4px),
+    calc(100% - var(--tag-h) - 4px)
+  );
+}
+
+.camera__tag svg {
+  flex: none;
+  color: var(--rail);
 }
 
 .camera__empty {
