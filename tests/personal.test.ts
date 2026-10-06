@@ -2,8 +2,10 @@ import { describe, expect, it } from "vitest";
 import {
   DEFAULT_THRESHOLDS as TH,
   INITIAL_ALERT_STATE,
+  firstOffsetAhead,
   initialPersonalState,
   personalThresholds,
+  pointAhead,
   stepAlert,
   type AlertEvent,
   type AlertState,
@@ -61,6 +63,34 @@ describe("personal alert point", () => {
     expect(sanitizeOffset(15)).toBe(0);
     expect(sanitizeOffset("-20")).toBe(0);
     expect(sanitizeOffset(undefined, -10)).toBe(-10);
+  });
+});
+
+describe("picking an alert point the water has not reached", () => {
+  it("allows only points above the current level", () => {
+    // Water at 2.05: watch -20 (2.00) is passed, watch -10 (2.10) is still ahead.
+    expect(pointAhead(2.05, TH, "watch", -20)).toBe(false);
+    expect(pointAhead(2.05, TH, "watch", -10)).toBe(true);
+    expect(pointAhead(2.05, TH, "danger", -30)).toBe(true); // 2.20
+  });
+
+  it("treats a point the water stands exactly at as passed", () => {
+    expect(pointAhead(2.2, TH, "watch", 0)).toBe(false);
+    expect(pointAhead(2.19, TH, "watch", 0)).toBe(true);
+  });
+
+  it("allows anything with no reading or with alerts off", () => {
+    expect(pointAhead(null, TH, "watch", -50)).toBe(true);
+    expect(pointAhead(3, TH, "off", -50)).toBe(true);
+  });
+
+  it("finds the earliest point still above the water", () => {
+    expect(firstOffsetAhead(1.5, TH, "watch")).toBe(-50);
+    expect(firstOffsetAhead(2.05, TH, "watch")).toBe(-10);
+    expect(firstOffsetAhead(2.3, TH, "danger")).toBe(-10); // 2.40
+    expect(firstOffsetAhead(2.5, TH, "watch")).toBeNull(); // watch +30 is 2.50
+    expect(firstOffsetAhead(2.79, TH, "danger")).toBe(30);
+    expect(firstOffsetAhead(2.8, TH, "danger")).toBeNull();
   });
 });
 
