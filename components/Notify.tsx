@@ -2,7 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { OFFSET_CHOICES, personalThresholds, type AlertPreference } from "@/lib/alerts";
-import { STATUS_LABEL, cmBetween, formatOffset, thresholdGap } from "@/lib/format";
+import { STATUS_LABEL, cmBetween, formatOffset, thresholdGap, toGoWord } from "@/lib/format";
+import type { Estimate } from "@/lib/summary";
 import { externalBrowserUrl, type InAppBrowser } from "@/lib/inapp";
 import type { DigestEvery, DigestPref } from "@/lib/schedule";
 import { BellIcon } from "./icons";
@@ -31,14 +32,14 @@ function alertSummary(a: AlertPreference, offsetCm: number) {
 }
 
 /** How far the water is from the next point this device will be alerted at. */
-function distanceToMine(level: number, prefs: Prefs, watch: number, danger: number) {
+function distanceToMine(level: number, estimate: Estimate | undefined, prefs: Prefs, watch: number, danger: number) {
   const mine = personalThresholds({ watch, danger, hysteresis: 0, repeatStep: 0 }, prefs.offsetCm);
   const gap =
     prefs.alerts === "danger" && level < mine.danger
-      ? { cm: Math.max(1, Math.round((mine.danger - level) * 100)), target: "danger" as const, over: false }
-      : thresholdGap(level, mine);
+      ? { cm: Math.max(1, Math.round((mine.danger - level) * 100)), target: "danger" as const, over: false, estimate }
+      : thresholdGap(level, mine, estimate);
   if (gap.over) return `ตอนนี้น้ำสูงกว่าจุดเตือนอันตรายของคุณ ${gap.cm} ซม.`;
-  return `ตอนนี้อีก ${gap.cm} ซม. ถึงจุดเตือน${STATUS_LABEL[gap.target]}ของคุณ`;
+  return `ตอนนี้${toGoWord(gap.estimate)} ${gap.cm} ซม. ถึงจุดเตือน${STATUS_LABEL[gap.target]}ของคุณ`;
 }
 
 function Message({ push }: { push: PushApi }) {
@@ -192,6 +193,7 @@ export function NotifySettings({
   watch,
   danger,
   latestLevel,
+  latestEstimate,
   provisional,
 }: {
   push: PushApi;
@@ -199,6 +201,8 @@ export function NotifySettings({
   danger: number;
   /** Latest reading on the gauge scale, used only to say how far the chosen point is. */
   latestLevel: number | null;
+  /** How latestLevel was estimated, when it was not a clean read. */
+  latestEstimate?: Estimate;
   provisional?: boolean;
 }) {
   const mark = provisional ? " (เกณฑ์ชั่วคราว)" : "";
@@ -308,7 +312,7 @@ export function NotifySettings({
             </p>
             {latestLevel !== null && (
               <p className="field-note num" data-live="">
-                {distanceToMine(latestLevel, prefs, watch, danger)}
+                {distanceToMine(latestLevel, latestEstimate, prefs, watch, danger)}
               </p>
             )}
           </>

@@ -24,7 +24,7 @@ import {
   type SiteState,
   type Subscriber,
 } from "./store";
-import { summarize } from "./summary";
+import { summarize, type Estimate } from "./summary";
 import { applyTransform, makeReference, patchFits, toCalibratedY, track } from "./track";
 
 const HOUR = 60 * 60 * 1000;
@@ -36,7 +36,7 @@ const CAMERA_DOWN_NOTICE_AFTER = 6;
 export type TickResult = {
   ok: boolean;
   skipped?: "locked";
-  reading?: { level: number | null; confidence: string; reason?: string; y: number | null };
+  reading?: { level: number | null; confidence: string; reason?: string; y: number | null; estimate?: Estimate };
   tracking?: TrackingDecision["state"];
   error?: string;
   status?: string;
@@ -72,18 +72,19 @@ export async function runTick(origin: string, now = Date.now(), deps: TickDeps =
       const r = decision.reading;
       notices.push(...decision.notices);
       state = { ...state, tracking: decision.state };
-      readingInfo = { level: r.level, confidence: r.confidence, reason: r.reason, y: r.y };
-      await setSnapshot({ t: cap.capturedAt, jpegBase64: cap.jpeg.toString("base64"), y: r.ok ? r.y : null });
+      const estimate: Estimate | undefined = r.belowRange ? "below" : r.approx ? "approx" : undefined;
+      readingInfo = { level: r.level, confidence: r.confidence, reason: r.reason, y: r.y, estimate };
+      await setSnapshot({ t: cap.capturedAt, jpegBase64: cap.jpeg.toString("base64"), ...(r.ok ? { y: r.y, estimate } : { y: null }) });
 
       if (r.ok && r.level !== null) {
         reading = { t: cap.capturedAt, level: r.level, confidence: r.confidence };
-        await addReading({ ...reading, y: r.y ?? undefined });
+        await addReading({ ...reading, y: r.y ?? undefined, ...(estimate && { estimate }) });
         const stepped = stepAlert(state.alert, reading, config.thresholds);
         events = stepped.events;
         state = {
           ...state,
           alert: stepped.state,
-          lastRead: { t: cap.capturedAt, ok: true, level: r.level, confidence: r.confidence, reason: r.reason, y: r.y },
+          lastRead: { t: cap.capturedAt, ok: true, level: r.level, confidence: r.confidence, reason: r.reason, y: r.y, estimate },
           lastSuccessAt: cap.capturedAt,
           failingSince: null,
           failureStreak: 0,

@@ -2,10 +2,9 @@
 
 import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { formatDateTime, formatGap, formatTime } from "@/lib/format";
+import type { ChartPoint as Point } from "@/lib/public-state";
 import { PlayIcon } from "./icons";
 import { BANGKOK_OFFSET_MS } from "@/lib/schedule";
-
-type Point = [number, number];
 type Range = "24h" | "7d" | "30d";
 
 const RANGE_LABEL: Record<Range, string> = { "24h": "24 ชม.", "7d": "7 วัน", "30d": "30 วัน" };
@@ -155,6 +154,9 @@ export function LevelChart({ day, watch, danger, now, provisional }: Props) {
   const activePoint = active !== null && points ? points[Math.min(active, points.length - 1)] : null;
   const latest = points?.at(-1);
   const th = { watch, danger };
+  const gapAt = (p: Point) => formatGap(p[1], th, p[2]);
+  const anyBelow = !!points?.some((p) => p[2] === "below");
+  const anyApprox = !!points?.some((p) => p[2] === "approx");
 
   return (
     <section className="section" aria-labelledby={titleId}>
@@ -202,7 +204,7 @@ export function LevelChart({ day, watch, danger, now, provisional }: Props) {
               height={H}
               viewBox={`0 0 ${width} ${H}`}
               role="img"
-              aria-label={`กราฟระดับน้ำ ${RANGE_LABEL[range]} ล่าสุด ${latest ? formatGap(latest[1], th) : "ไม่มีค่า"} ใช้ลูกศรซ้ายขวาเพื่อดูค่าแต่ละจุด`}
+              aria-label={`กราฟระดับน้ำ ${RANGE_LABEL[range]} ล่าสุด ${latest ? gapAt(latest) : "ไม่มีค่า"} ใช้ลูกศรซ้ายขวาเพื่อดูค่าแต่ละจุด`}
               tabIndex={0}
               onKeyDown={onKey}
               onPointerMove={(e: PointerEvent<SVGSVGElement>) => pick(e.clientX, e.currentTarget)}
@@ -256,7 +258,7 @@ export function LevelChart({ day, watch, danger, now, provisional }: Props) {
                 style={{ left: Math.min(Math.max(geo.x(activePoint[0]), 100), width - 100) }}
                 aria-live="polite"
               >
-                <strong>{formatGap(activePoint[1], th)}</strong>
+                <strong>{gapAt(activePoint)}</strong>
                 <br />
                 {range === "24h" ? formatTime(activePoint[0]) : formatDateTime(activePoint[0])}
               </div>
@@ -271,8 +273,10 @@ export function LevelChart({ day, watch, danger, now, provisional }: Props) {
 
       {latest && (
         <p className="legend-rails">
-          ล่าสุด {formatGap(latest[1], th)}
+          ล่าสุด {gapAt(latest)}
           {geo && ` · เส้นแนวนอนห่างกัน ${Math.round(geo.step * 100)} ซม.`}
+          {anyApprox && " · ช่วงที่น้ำอยู่ช่วงล่างของไม้วัดเป็นค่าประมาณ อาจคลาดเคลื่อนราว 5 ซม."}
+          {anyBelow && " · ช่วงที่น้ำต่ำกว่าที่ระบบอ่านได้ เส้นแสดงที่ค่าต่ำสุดที่อ่านได้"}
           {range !== "24h" && " · แต่ละจุดคือค่าสูงสุดในช่วงนั้น"}
           {provisional && " · * เกณฑ์ชั่วคราว"}
         </p>
@@ -296,7 +300,7 @@ export function LevelChart({ day, watch, danger, now, provisional }: Props) {
                 {[...points].reverse().map((p) => (
                   <tr key={p[0]}>
                     <td>{formatDateTime(p[0])}</td>
-                    <td>{formatGap(p[1], th)}</td>
+                    <td>{gapAt(p)}</td>
                   </tr>
                 ))}
               </tbody>

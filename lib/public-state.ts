@@ -1,11 +1,18 @@
 import { getConfig } from "./config";
 import { getSnapshotMeta, getState, readingsSince, recentEvents, type LoggedEvent, type SnapshotMeta } from "./store";
-import { summarize, type StoredReading } from "./summary";
+import { summarize, type Estimate, type StoredReading } from "./summary";
 import type { Status } from "./alerts";
 import type { TrackingStatus } from "./autotrack";
 
 const HOUR = 60 * 60 * 1000;
 const STALE_AFTER_MS = 30 * 60 * 1000;
+
+/** A chart point: time, level, and how the level was estimated when it was not a clean read. */
+export type ChartPoint = [t: number, level: number, estimate?: Estimate];
+
+export function chartPoint(r: StoredReading): ChartPoint {
+  return r.estimate ? [r.t, r.level, r.estimate] : [r.t, r.level];
+}
 
 export type PublicState = {
   now: number;
@@ -26,7 +33,7 @@ export type PublicState = {
   events: LoggedEvent[];
   snapshot: SnapshotMeta | null;
   /** Readings for the past 24 h, oldest first. */
-  day: Array<[number, number]>;
+  day: ChartPoint[];
 };
 
 export async function getPublicState(now = Date.now()): Promise<PublicState> {
@@ -57,6 +64,6 @@ export async function getPublicState(now = Date.now()): Promise<PublicState> {
     tracking: state.tracking.status,
     events,
     snapshot,
-    day: readings.filter((r) => r.t >= now - 24 * HOUR).map((r) => [r.t, r.level]),
+    day: readings.filter((r) => r.t >= now - 24 * HOUR).map(chartPoint),
   };
 }

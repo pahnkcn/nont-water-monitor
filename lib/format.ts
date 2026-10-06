@@ -1,4 +1,5 @@
 import type { Status, Thresholds } from "./alerts";
+import type { Estimate } from "./summary";
 import type { Transform } from "./track";
 
 export const STATUS_LABEL: Record<Status, string> = {
@@ -30,21 +31,30 @@ export type Gap = {
   target: "watch" | "danger";
   /** True once the water is at or over danger; cm then counts how far over. */
   over: boolean;
+  /** Set when the level was only estimated: cm is then about right ("approx") or a floor ("below"). */
+  estimate?: Estimate;
 };
 
 /** Distance from a level to the next threshold above it, or past danger. */
-export function thresholdGap(level: number, th: Pick<Thresholds, "watch" | "danger">): Gap {
+export function thresholdGap(level: number, th: Pick<Thresholds, "watch" | "danger">, estimate?: Estimate): Gap {
+  // Estimates only happen far down the gauge, never over danger.
   if (level >= th.danger) return { cm: Math.round((level - th.danger) * 100), target: "danger", over: true };
   const target = level < th.watch ? "watch" : "danger";
   // Never "0 cm to go" while still below the line.
-  return { cm: Math.max(1, Math.round((th[target] - level) * 100)), target, over: false };
+  const cm = Math.max(1, Math.round((th[target] - level) * 100));
+  return estimate ? { cm, target, over: false, estimate } : { cm, target, over: false };
 }
 
-/** "อีก 85 ซม. ถึงระดับเฝ้าระวัง" / "สูงกว่าระดับอันตราย 12 ซม." */
-export function formatGap(level: number, th: Pick<Thresholds, "watch" | "danger">) {
-  const g = thresholdGap(level, th);
+/** "อีก" / "อีกประมาณ" / "อีกมากกว่า" in front of a distance still to go. */
+export function toGoWord(estimate?: Estimate) {
+  return estimate === "below" ? "อีกมากกว่า" : estimate === "approx" ? "อีกประมาณ" : "อีก";
+}
+
+/** "อีก 85 ซม. ถึงระดับเฝ้าระวัง" / "อีกประมาณ 144 ซม. ถึงระดับเฝ้าระวัง" / "สูงกว่าระดับอันตราย 12 ซม." */
+export function formatGap(level: number, th: Pick<Thresholds, "watch" | "danger">, estimate?: Estimate) {
+  const g = thresholdGap(level, th, estimate);
   if (g.over) return g.cm ? `สูงกว่าระดับอันตราย ${g.cm} ซม.` : "ถึงระดับอันตรายแล้ว";
-  return `อีก ${g.cm} ซม. ถึงระดับ${STATUS_LABEL[g.target]}`;
+  return `${toGoWord(g.estimate)} ${g.cm} ซม. ถึงระดับ${STATUS_LABEL[g.target]}`;
 }
 
 /** A personal alert point: "ก่อนถึงเกณฑ์ 20 ซม." / "เกินเกณฑ์ 20 ซม." / "ตรงเกณฑ์". */

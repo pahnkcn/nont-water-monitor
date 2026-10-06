@@ -126,7 +126,12 @@ export function AdminPanel() {
       if (res.status === 409) throw new Error("กำลังอ่านค่ารอบอื่นอยู่ ลองใหม่ในอีกสักครู่");
       if (!res.ok || !d.ok) throw new Error(`อ่านค่าไม่สำเร็จ: ${d.error ?? d.reading?.reason ?? res.status}`);
       const reason = d.reading?.reason ? ` · ${REASON_LABEL[d.reading.reason] ?? d.reading.reason}` : "";
-      const read = d.reading?.level != null ? `อ่านได้ ${d.reading.level.toFixed(2)} ม. ตามสเกลไม้วัด` : "อ่านค่าไม่ได้";
+      const read =
+        d.reading?.level == null
+          ? "อ่านค่าไม่ได้"
+          : d.reading.estimate === "below"
+            ? `น้ำต่ำกว่าช่วงที่อ่านได้ (ต่ำกว่า ${d.reading.level.toFixed(2)} ม. ตามสเกลไม้วัด)`
+            : `อ่านได้${d.reading.estimate === "approx" ? "ประมาณ" : ""} ${d.reading.level.toFixed(2)} ม. ตามสเกลไม้วัด`;
       await load(password);
       setMsg({
         text: `${read} (ความมั่นใจ ${d.reading?.confidence ?? "-"}${reason}) · ส่งเตือน ${d.sent.alerts} · ข่าวตามรอบ ${d.sent.digests} · ถึงผู้ดูแล ${d.sent.system}`,
@@ -211,7 +216,7 @@ export function AdminPanel() {
           <li>
             อ่านล่าสุด:{" "}
             {state.lastRead
-              ? `${formatDateTime(state.lastRead.t)} ${state.lastRead.ok ? `${state.lastRead.level?.toFixed(2)} ม. (${state.lastRead.confidence})` : `ไม่สำเร็จ: ${REASON_LABEL[state.lastRead.reason ?? ""] ?? state.lastRead.reason}`}`
+              ? `${formatDateTime(state.lastRead.t)} ${state.lastRead.ok ? `${state.lastRead.estimate === "below" ? "ต่ำกว่า " : state.lastRead.estimate === "approx" ? "ประมาณ " : ""}${state.lastRead.level?.toFixed(2)} ม. (${state.lastRead.confidence})` : `ไม่สำเร็จ: ${REASON_LABEL[state.lastRead.reason ?? ""] ?? state.lastRead.reason}`}`
               : "ยังไม่เคยอ่าน"}
           </li>
           <li>อ่านไม่สำเร็จติดกัน: {state.failureStreak} รอบ</li>
@@ -337,7 +342,11 @@ export function AdminPanel() {
               ))}
               {data.snapshot.y !== null && (
                 <div className="camera__line" style={{ top: `${(data.snapshot.y / 600) * 100}%` }}>
-                  <span>ผิวน้ำที่ตรวจพบ แถว {data.snapshot.y}</span>
+                  <span>
+                    {data.snapshot.estimate === "below"
+                      ? `ไม่พบน้ำถึงแถวสุดท้ายที่อ่าน (${data.snapshot.y})`
+                      : `ผิวน้ำที่ตรวจพบ แถว ${data.snapshot.y}${data.snapshot.estimate === "approx" ? " (ช่วงล่าง ค่าประมาณ)" : ""}`}
+                  </span>
                 </div>
               )}
             </>

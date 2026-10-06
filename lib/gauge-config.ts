@@ -5,6 +5,8 @@
 // Marks are the vertical centres of the decimetre labels (".90", "80", ...).
 // The meter digit at the plate joint is not legible in the stream; the lower
 // plate is assumed to read 1.xx m and the upper plate 2.xx m. Confirm in /admin.
+// The marks below 1.30 were read off a low-water day frame (2026-10-06 07:56); the
+// 1.00 label is hidden behind a bolt, so that stretch is interpolated.
 
 export type Point = { x: number; y: number };
 
@@ -47,5 +49,9 @@ export const DEFAULT_GAUGE_CONFIG: GaugeConfig = {
     { y: 312, level: 1.5 },
     { y: 331, level: 1.4 },
     { y: 352, level: 1.3 },
+    { y: 371, level: 1.2 },
+    { y: 391, level: 1.1 },
+    { y: 428, level: 0.9 },
+    { y: 445, level: 0.8 },
   ],
 };
