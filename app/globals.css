@@ -413,6 +413,10 @@ select {
 /* ---------- staff gauge (ไม้วัดจำลอง) ---------- */
 
 .louvre {
+  position: relative;
+}
+
+.louvre svg {
   display: block;
   width: 100%;
   height: auto;
@@ -439,22 +443,24 @@ select {
   stroke-width: 1;
 }
 
-/* Sizes are viewBox units. On a phone the gauge shrinks to about 0.7 of its viewBox,
-   so the names start larger there to land near 14px on screen. */
-.louvre .rail-label {
-  font-size: 19px;
+/* Rail names sit on their rail at the left edge, on a ground chip that cuts the column and
+   waterline behind them. Plain HTML text: no SVG stroke knockout, which Samsung Internet smears. */
+.louvre__rail {
+  position: absolute;
+  left: 0;
+  padding-right: 3px;
+  background: var(--ground);
+  color: var(--ink);
+  font-size: 0.875rem;
   font-weight: 700;
-  paint-order: stroke;
-  stroke: var(--ground);
-  stroke-width: 4px;
-  stroke-linejoin: round;
+  line-height: 1.25;
+  white-space: nowrap;
+  transform: translateY(calc(-100% - 2px));
+  pointer-events: none;
 }
 
-@media (min-width: 640px) {
-  .louvre .rail-label {
-    font-size: 14px;
-    stroke-width: 3px;
-  }
+.louvre__rail[data-below] {
+  transform: translateY(3px);
 }
 
 .louvre .waterline {
@@ -683,14 +689,22 @@ select {
   font-size: 11px;
 }
 
-/* Rail names sit just above their line, knocked out of the grid like on the gauge. */
-.chart .rail-name {
-  fill: var(--ink);
-  font-size: 13px;
+/* Rail names sit just above their line on a ground chip, like on the gauge. */
+.chart__rail {
+  position: absolute;
+  padding: 0 3px;
+  background: var(--ground);
+  color: var(--ink);
+  font-size: 0.8125rem;
   font-weight: 700;
-  paint-order: stroke;
-  stroke: var(--ground);
-  stroke-width: 3px;
+  line-height: 1.25;
+  white-space: nowrap;
+  transform: translateY(calc(-100% - 2px));
+  pointer-events: none;
+}
+
+.chart__rail[data-below] {
+  transform: translateY(3px);
 }
 
 .chart .area {

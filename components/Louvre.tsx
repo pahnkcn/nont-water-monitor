@@ -25,7 +25,7 @@ const RULE_X = COL_X + COL_W;
 const RAIL_END = 108;
 const DIM_X = 132;
 const TERM = 4; // half-length of a 45° dimension terminator
-const CROWD = 28; // rails closer than this put watch's name under its rail
+const CROWD = 32; // rails closer than this put watch's name under its rail
 
 export function louvreRange(level: number | null, danger: number) {
   const top = Math.max(3.0, Math.ceil((danger + 0.3) * 10) / 10);
@@ -72,63 +72,67 @@ export function Louvre({ level, estimate, watch, danger, provisional }: Props) {
     (provisional ? " เกณฑ์ยังเป็นค่าชั่วคราว" : "");
 
   return (
-    <svg className="louvre" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={description}>
-      {/* water column and ruler */}
-      <rect className="column" x={COL_X + 0.5} y={innerTop + 0.5} width={COL_W - 1} height={innerH - 1} />
-      {waterY !== null && <rect className="water" x={COL_X} y={waterY} width={COL_W} height={base - waterY} />}
-      {Array.from({ length: steps + 1 }, (_, i) => {
-        const ty = innerTop + i * PITCH;
-        // Every fifth mark is longer, counted on the gauge's own 10 cm steps.
-        const long = Math.round(top * 10 - i) % 5 === 0;
-        return <line key={i} className="tick" x1={RULE_X} x2={RULE_X + (long ? 10 : 5)} y1={ty} y2={ty} />;
-      })}
-      <line className="rule" x1={RULE_X} x2={RULE_X} y1={innerTop} y2={base} />
+    <div className="louvre">
+      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={description}>
+        {/* water column and ruler */}
+        <rect className="column" x={COL_X + 0.5} y={innerTop + 0.5} width={COL_W - 1} height={innerH - 1} />
+        {waterY !== null && <rect className="water" x={COL_X} y={waterY} width={COL_W} height={base - waterY} />}
+        {Array.from({ length: steps + 1 }, (_, i) => {
+          const ty = innerTop + i * PITCH;
+          // Every fifth mark is longer, counted on the gauge's own 10 cm steps.
+          const long = Math.round(top * 10 - i) % 5 === 0;
+          return <line key={i} className="tick" x1={RULE_X} x2={RULE_X + (long ? 10 : 5)} y1={ty} y2={ty} />;
+        })}
+        <line className="rule" x1={RULE_X} x2={RULE_X} y1={innerTop} y2={base} />
 
-      {/* threshold rails */}
-      {rails.map((r) => {
-        // When the two rails would overlap, the lower (watch) rail thins so danger stays whole.
-        const thin = r.key === "watch" && Math.abs(y(watch) - y(danger)) < 5;
-        return <line key={r.key} x1={0} x2={RAIL_END} y1={y(r.value)} y2={y(r.value)} stroke={r.color} strokeWidth={thin ? 1 : 2} />;
-      })}
+        {/* threshold rails */}
+        {rails.map((r) => {
+          // When the two rails would overlap, the lower (watch) rail thins so danger stays whole.
+          const thin = r.key === "watch" && Math.abs(y(watch) - y(danger)) < 5;
+          return <line key={r.key} x1={0} x2={RAIL_END} y1={y(r.value)} y2={y(r.value)} stroke={r.color} strokeWidth={thin ? 1 : 2} />;
+        })}
 
-      {/* the reading: waterline and the dimension to the next threshold */}
-      {waterY !== null && (
-        <g className="reading">
-          <line className="waterline" x1={COL_X} x2={DIM_X} y1={waterY} y2={waterY} />
-          <circle className="origin" cx={DIM_X} cy={waterY} r={2.5} />
-          {dim && gap && (
-            <>
-              <line x1={RAIL_END} x2={DIM_X + 5} y1={dim.railY} y2={dim.railY} stroke={dim.color} strokeWidth={1} />
-              <line className="dim" x1={DIM_X} x2={DIM_X} y1={dim.a} y2={dim.b} />
-              <path
-                className="dim-end"
-                d={`M${DIM_X - TERM} ${dim.a + TERM} l${TERM * 2} ${-TERM * 2} M${DIM_X - TERM} ${dim.b + TERM} l${TERM * 2} ${-TERM * 2}`}
-              />
-              <text
-                className="dim-value"
-                x={DIM_X + 7}
-                y={Math.min(H - 4, Math.max(innerTop + 14, (dim.a + dim.b) / 2 + 7))}
-              >
-                {dim.prefix}
-                {gap.cm}
-                <tspan className="dim-unit"> ซม.</tspan>
-              </text>
-            </>
-          )}
-        </g>
-      )}
-
-      {/* Rail names sit on their rail, as on the chart, and paint last so their knockout stays whole.
-          When the rails crowd, watch's name drops below its rail; dy in em follows the CSS font size. */}
-      {rails.map((r) => {
-        const below = r.key === "watch" && rails.length === 2 && y(watch) - y(danger) < CROWD;
-        return (
-          <text key={r.key} className="rail-label" x={0} y={y(r.value) + (below ? 4 : -5)} dy={below ? "1.1em" : undefined} fill="currentColor">
-            {r.label}
-            {mark}
-          </text>
-        );
-      })}
-    </svg>
+        {/* the reading: waterline and the dimension to the next threshold */}
+        {waterY !== null && (
+          <g className="reading">
+            <line className="waterline" x1={COL_X} x2={DIM_X} y1={waterY} y2={waterY} />
+            <circle className="origin" cx={DIM_X} cy={waterY} r={2.5} />
+            {dim && gap && (
+              <>
+                <line x1={RAIL_END} x2={DIM_X + 5} y1={dim.railY} y2={dim.railY} stroke={dim.color} strokeWidth={1} />
+                <line className="dim" x1={DIM_X} x2={DIM_X} y1={dim.a} y2={dim.b} />
+                <path
+                  className="dim-end"
+                  d={`M${DIM_X - TERM} ${dim.a + TERM} l${TERM * 2} ${-TERM * 2} M${DIM_X - TERM} ${dim.b + TERM} l${TERM * 2} ${-TERM * 2}`}
+                />
+                <text
+                  className="dim-value"
+                  x={DIM_X + 7}
+                  y={Math.min(H - 4, Math.max(innerTop + 14, (dim.a + dim.b) / 2 + 7))}
+                >
+                  {dim.prefix}
+                  {gap.cm}
+                  <tspan className="dim-unit"> ซม.</tspan>
+                </text>
+              </>
+            )}
+          </g>
+        )}
+      </svg>
+      {/* Rail names are HTML, not SVG text: Samsung Internet smears stroked SVG text, and HTML
+          keeps them at a fixed on-screen size however far the gauge scales down. */}
+      {rails.map((r) => (
+        <span
+          key={r.key}
+          className="louvre__rail"
+          data-below={r.key === "watch" && rails.length === 2 && y(watch) - y(danger) < CROWD ? "" : undefined}
+          style={{ top: `${(y(r.value) / H) * 100}%` }}
+          aria-hidden
+        >
+          {r.label}
+          {mark}
+        </span>
+      ))}
+    </div>
   );
 }
