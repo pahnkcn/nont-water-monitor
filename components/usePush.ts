@@ -164,6 +164,11 @@ export function usePush() {
         const sub = await reg.pushManager.getSubscription();
         if (!sub) throw new Error("no subscription");
         const res = await post<Prefs>("/api/push/subscribe", { subscription: sub.toJSON(), ...next });
+        if (res.status === 409) {
+          setPrefs(previous);
+          setMessage({ text: "น้ำสูงเลยจุดนั้นแล้ว เลือกจุดที่สูงกว่าระดับน้ำตอนนี้", tone: "bad" });
+          return;
+        }
         if (!res.ok) throw new Error(String(res.status));
         setPrefs(res.data);
         setMessage({ text: "บันทึกแล้ว", tone: "ok" });

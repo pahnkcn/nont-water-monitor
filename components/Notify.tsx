@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { OFFSET_CHOICES, personalThresholds, type AlertPreference } from "@/lib/alerts";
+import { OFFSET_CHOICES, firstOffsetAhead, personalThresholds, pointAhead, type AlertPreference } from "@/lib/alerts";
 import { STATUS_LABEL, cmBetween, formatOffset, thresholdGap, toGoWord } from "@/lib/format";
 import type { Estimate } from "@/lib/summary";
 import { externalBrowserUrl, type InAppBrowser } from "@/lib/inapp";
@@ -18,6 +18,8 @@ const EVERY_LABEL: Record<DigestEvery, string> = {
 };
 
 const pad = (h: number) => `${String(h).padStart(2, "0")}:00 น.`;
+
+const PASSED = "น้ำสูงเลยระดับนี้แล้ว";
 
 function digestSummary(d: DigestPref) {
   if (d.every === "off") return "ไม่รับข่าวตามรอบ";
@@ -225,6 +227,21 @@ export function NotifySettings({
   const set = (patch: Partial<Prefs>) => push.update({ ...prefs, ...patch });
   const setDigest = (patch: Partial<DigestPref>) => set({ digest: { ...prefs.digest, ...patch } });
 
+  // Alert points the water has already reached cannot be picked: they would never alert.
+  const th = { watch, danger };
+  const ahead = (pref: AlertPreference, o: number) => pointAhead(latestLevel, th, pref, o);
+  const passed = (pref: AlertPreference) => pref !== prefs.alerts && firstOffsetAhead(latestLevel, th, pref) === null;
+  /** Switching level keeps the point, or moves it up to the first one still above the water. */
+  const setAlerts = (alerts: AlertPreference) => {
+    const offsetCm = ahead(alerts, prefs.offsetCm) ? prefs.offsetCm : firstOffsetAhead(latestLevel, th, alerts);
+    if (offsetCm !== null) set({ alerts, offsetCm });
+  };
+  const offsetOption = (o: number) => (
+    <option key={o} value={o} disabled={!ahead(prefs.alerts, o)}>
+      {ahead(prefs.alerts, o) ? formatOffset(o) : `${formatOffset(o)} (น้ำเลยจุดนี้แล้ว)`}
+    </option>
+  );
+
   return (
     <form onSubmit={(e) => e.preventDefault()}>
       <fieldset className="field">
@@ -262,23 +279,35 @@ export function NotifySettings({
         <p className="hint">ได้แจ้งอีกครั้งเมื่อน้ำลดพ้นระดับที่เคยเตือน</p>
         <div className="choices">
           <label className="choice">
-            <input type="radio" name="alerts" checked={prefs.alerts === "watch"} onChange={() => set({ alerts: "watch" })} />
+            <input
+              type="radio"
+              name="alerts"
+              checked={prefs.alerts === "watch"}
+              disabled={passed("watch")}
+              onChange={() => setAlerts("watch")}
+            />
             <span>
               ระดับเฝ้าระวัง
-              <small>และระดับอันตราย{mark}</small>
+              <small>{passed("watch") ? PASSED : <>และระดับอันตราย{mark}</>}</small>
             </span>
           </label>
           <label className="choice">
-            <input type="radio" name="alerts" checked={prefs.alerts === "danger"} onChange={() => set({ alerts: "danger" })} />
+            <input
+              type="radio"
+              name="alerts"
+              checked={prefs.alerts === "danger"}
+              disabled={passed("danger")}
+              onChange={() => setAlerts("danger")}
+            />
             <span>
               ระดับอันตรายเท่านั้น
               <small className="num">
-                สูงกว่าระดับเฝ้าระวัง {cmBetween(danger, watch)} ซม.{mark}
+                {passed("danger") ? PASSED : <>สูงกว่าระดับเฝ้าระวัง {cmBetween(danger, watch)} ซม.{mark}</>}
               </small>
             </span>
           </label>
           <label className="choice">
-            <input type="radio" name="alerts" checked={prefs.alerts === "off"} onChange={() => set({ alerts: "off" })} />
+            <input type="radio" name="alerts" checked={prefs.alerts === "off"} onChange={() => setAlerts("off")} />
             <span>
               ไม่รับการเตือนภัย
               <small>รับเฉพาะข่าวตามรอบ</small>
@@ -290,21 +319,9 @@ export function NotifySettings({
             <label className="inline-select">
               <span>จุดเตือนของเครื่องนี้</span>
               <select value={prefs.offsetCm} onChange={(e) => set({ offsetCm: Number(e.target.value) })}>
-                <optgroup label="เตือนก่อนน้ำถึงเกณฑ์">
-                  {OFFSET_CHOICES.filter((o) => o < 0).map((o) => (
-                    <option key={o} value={o}>
-                      {formatOffset(o)}
-                    </option>
-                  ))}
-                </optgroup>
-                <option value={0}>{formatOffset(0)}</option>
-                <optgroup label="เตือนเมื่อน้ำเกินเกณฑ์ไปแล้ว">
-                  {OFFSET_CHOICES.filter((o) => o > 0).map((o) => (
-                    <option key={o} value={o}>
-                      {formatOffset(o)}
-                    </option>
-                  ))}
-                </optgroup>
+                <optgroup label="เตือนก่อนน้ำถึงเกณฑ์">{OFFSET_CHOICES.filter((o) => o < 0).map(offsetOption)}</optgroup>
+                {offsetOption(0)}
+                <optgroup label="เตือนเมื่อน้ำเกินเกณฑ์ไปแล้ว">{OFFSET_CHOICES.filter((o) => o > 0).map(offsetOption)}</optgroup>
               </select>
             </label>
             {latestLevel !== null && (
