@@ -3,10 +3,19 @@
 import { useCallback, useEffect, useState } from "react";
 import type { AlertPreference } from "@/lib/alerts";
 import { inAppBrowser, type InAppBrowser } from "@/lib/inapp";
+import { DEFAULT_REPEAT, type RepeatPref } from "@/lib/remind";
 import type { DigestPref } from "@/lib/schedule";
 
-/** `offsetCm` is the personal alert point against the site thresholds (OFFSET_CHOICES). */
-export type Prefs = { digest: DigestPref; alerts: AlertPreference; offsetCm: number };
+/**
+ * `offsetCm` is the personal alert point against the site thresholds (OFFSET_CHOICES);
+ * `repeat` the minutes between reminders at each level (REPEAT_CHOICES).
+ */
+export type Prefs = { digest: DigestPref; alerts: AlertPreference; offsetCm: number; repeat: RepeatPref };
+
+/** Settings as the server returned them; fills what an older response leaves out. */
+function toPrefs(d: Partial<Prefs> & Pick<Prefs, "digest" | "alerts">): Prefs {
+  return { digest: d.digest, alerts: d.alerts, offsetCm: d.offsetCm ?? 0, repeat: d.repeat ?? DEFAULT_REPEAT };
+}
 
 export type Platform = { ios: boolean; inApp: InAppBrowser | null };
 
@@ -103,7 +112,7 @@ export function usePush() {
         if (cancelled) return;
         if (res?.ok && res.data.subscribed && res.data.digest && res.data.alerts) {
           setEndpoint(sub.endpoint);
-          setPrefs({ digest: res.data.digest, alerts: res.data.alerts, offsetCm: res.data.offsetCm ?? 0 });
+          setPrefs(toPrefs({ ...res.data, digest: res.data.digest, alerts: res.data.alerts }));
           setPhase("on");
         } else {
           // New subscription, or the server forgot this device: register it, keeping the old settings if any.
@@ -114,7 +123,7 @@ export function usePush() {
           if (cancelled) return;
           if (again.ok) {
             setEndpoint(sub.endpoint);
-            setPrefs(again.data);
+            setPrefs(toPrefs(again.data));
             setPhase("on");
           } else setPhase("off");
         }
@@ -144,7 +153,7 @@ export function usePush() {
       });
       if (!res.ok) throw new Error(res.status === 503 ? "ผู้รับการแจ้งเตือนเต็มแล้ว" : "บันทึกการสมัครไม่สำเร็จ");
       setEndpoint(sub.endpoint);
-      setPrefs({ digest: res.data.digest, alerts: res.data.alerts, offsetCm: res.data.offsetCm ?? 0 });
+      setPrefs(toPrefs(res.data));
       setPhase("on");
       setMessage({ text: "เปิดการแจ้งเตือนแล้ว", tone: "ok" });
     } catch (e) {
@@ -170,7 +179,7 @@ export function usePush() {
           return;
         }
         if (!res.ok) throw new Error(String(res.status));
-        setPrefs(res.data);
+        setPrefs(toPrefs(res.data));
         setMessage({ text: "บันทึกแล้ว", tone: "ok" });
       } catch {
         setPrefs(previous);

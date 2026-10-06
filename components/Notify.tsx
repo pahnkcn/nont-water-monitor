@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import { OFFSET_CHOICES, firstOffsetAhead, personalThresholds, pointAhead, type AlertPreference } from "@/lib/alerts";
-import { STATUS_LABEL, cmBetween, formatOffset, thresholdGap, toGoWord } from "@/lib/format";
+import { STATUS_LABEL, cmBetween, formatEvery, formatOffset, thresholdGap, toGoWord } from "@/lib/format";
 import type { Estimate } from "@/lib/summary";
 import { externalBrowserUrl, type InAppBrowser } from "@/lib/inapp";
+import { REPEAT_CHOICES, type RepeatPref } from "@/lib/remind";
 import type { DigestEvery, DigestPref } from "@/lib/schedule";
-import { BellIcon } from "./icons";
+import { BellIcon, StateIcon } from "./icons";
 import type { Prefs, PushApi } from "./usePush";
 
 const EVERY_LABEL: Record<DigestEvery, string> = {
@@ -32,6 +33,19 @@ function alertSummary(a: AlertPreference, offsetCm: number) {
   const what = a === "watch" ? "เตือนทันทีตั้งแต่ระดับเฝ้าระวัง" : "เตือนทันทีเมื่อถึงระดับอันตราย";
   return offsetCm ? `${what} (${formatOffset(offsetCm)})` : what;
 }
+
+/** "เตือนซ้ำทุก 10 นาทีจนน้ำลด", naming the levels only when they repeat differently. */
+function repeatSummary(a: AlertPreference, r: RepeatPref) {
+  if (a === "off") return null;
+  const watch = a === "watch" ? r.watch : 0;
+  if (!watch && !r.danger) return "ไม่เตือนซ้ำ";
+  if (a === "danger" || watch === r.danger) return `เตือนซ้ำ${formatEvery(r.danger)}จนน้ำลด`;
+  if (!r.danger) return `เตือนซ้ำเฉพาะระดับเฝ้าระวัง ${formatEvery(watch)}`;
+  if (!watch) return `เตือนซ้ำเฉพาะระดับอันตราย ${formatEvery(r.danger)}`;
+  return `เตือนซ้ำระดับเฝ้าระวัง${formatEvery(watch)} อันตราย${formatEvery(r.danger)}`;
+}
+
+const repeatLabel = (minutes: number) => (minutes ? formatEvery(minutes) : "ไม่เตือนซ้ำ");
 
 /** How far the water is from the next point this device will be alerted at. */
 function distanceToMine(level: number, estimate: Estimate | undefined, prefs: Prefs, watch: number, danger: number) {
@@ -126,7 +140,10 @@ export function NotifyCta({ push }: { push: PushApi }) {
         <p className="facts" style={{ display: "flex", gap: 8, alignItems: "flex-start", margin: 0 }}>
           <BellIcon />
           <span>
-            <strong>แจ้งเตือนเปิดอยู่:</strong> {digestSummary(prefs.digest)} · {alertSummary(prefs.alerts, prefs.offsetCm)}{" "}
+            <strong>แจ้งเตือนเปิดอยู่:</strong>{" "}
+            {[digestSummary(prefs.digest), alertSummary(prefs.alerts, prefs.offsetCm), repeatSummary(prefs.alerts, prefs.repeat)]
+              .filter(Boolean)
+              .join(" · ")}{" "}
             <a href="#notify">ปรับการแจ้งเตือน</a>
           </span>
         </p>
@@ -182,7 +199,7 @@ export function NotifyCta({ push }: { push: PushApi }) {
         {phase === "working" ? "กำลังเปิดการแจ้งเตือน…" : "เปิดการแจ้งเตือน"}
       </button>
       <p className="facts quiet" style={{ marginTop: 8 }}>
-        ได้ข่าวระดับน้ำทุกเช้า 07:00 น. และเตือนทันทีเมื่อน้ำถึงระดับอันตราย เปลี่ยนรอบได้หลังเปิด
+        ได้ข่าวระดับน้ำทุกเช้า 07:00 น. เตือนทันทีเมื่อน้ำถึงระดับอันตราย และเตือนซ้ำทุก 10 นาทีจนน้ำลด ปรับได้หลังเปิด
       </p>
       <Message push={push} />
     </div>
@@ -226,6 +243,21 @@ export function NotifySettings({
 
   const set = (patch: Partial<Prefs>) => push.update({ ...prefs, ...patch });
   const setDigest = (patch: Partial<DigestPref>) => set({ digest: { ...prefs.digest, ...patch } });
+  const repeatSelect = (level: keyof RepeatPref) => (
+    <label className="inline-select">
+      <span className="repeat-level" data-level={level}>
+        <StateIcon status={level} size={18} cut="var(--ground)" />
+        ระดับ{STATUS_LABEL[level]}
+      </span>
+      <select value={prefs.repeat[level]} onChange={(e) => set({ repeat: { ...prefs.repeat, [level]: Number(e.target.value) } })}>
+        {REPEAT_CHOICES[level].map((m) => (
+          <option key={m} value={m}>
+            {repeatLabel(m)}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
 
   // Alert points the water has already reached cannot be picked: they would never alert.
   const th = { watch, danger };
@@ -333,6 +365,15 @@ export function NotifySettings({
         )}
       </fieldset>
 
+      {prefs.alerts !== "off" && (
+        <fieldset className="field">
+          <legend>เตือนซ้ำจนกว่าน้ำจะลด</legend>
+          <p className="hint">ส่งซ้ำตามรอบที่เลือก จนน้ำลดต่ำกว่าจุดเตือนของคุณ</p>
+          {prefs.alerts === "watch" && repeatSelect("watch")}
+          {repeatSelect("danger")}
+        </fieldset>
+      )}
+
       {push.platform.ios && prefs.alerts !== "off" && <FocusNote />}
 
       <fieldset className="field">
@@ -345,7 +386,7 @@ export function NotifySettings({
           />
           <span>
             งดข่าวตามรอบช่วง 22:00 ถึง 06:00 น.
-            <small>การเตือนภัยยังส่งตามปกติ</small>
+            <small>งดเตือนซ้ำระดับเฝ้าระวังด้วย ส่วนการเตือนภัยและเตือนซ้ำระดับอันตรายยังส่งตามปกติ</small>
           </span>
         </label>
       </fieldset>

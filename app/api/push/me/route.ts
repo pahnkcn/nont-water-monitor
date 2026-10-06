@@ -1,4 +1,5 @@
 import { readJson } from "@/lib/auth";
+import { DEFAULT_REPEAT } from "@/lib/remind";
 import { getSubscriber, subscriberId } from "@/lib/store";
 
 export async function POST(req: Request) {
@@ -7,7 +8,14 @@ export async function POST(req: Request) {
   const sub = await getSubscriber(subscriberId(body.endpoint));
   if (!sub) return Response.json({ subscribed: false }, { headers: { "cache-control": "no-store" } });
   return Response.json(
-    { subscribed: true, digest: sub.digest, alerts: sub.alerts, offsetCm: sub.offsetCm ?? 0, admin: Boolean(sub.admin) },
+    {
+      subscribed: true,
+      digest: sub.digest,
+      alerts: sub.alerts,
+      offsetCm: sub.offsetCm ?? 0,
+      repeat: sub.repeat ?? DEFAULT_REPEAT,
+      admin: Boolean(sub.admin),
+    },
     { headers: { "cache-control": "no-store" } },
   );
 }

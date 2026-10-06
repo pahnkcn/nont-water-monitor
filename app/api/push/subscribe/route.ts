@@ -1,6 +1,7 @@
 import { initialPersonalState, personalThresholds, pointAhead, type AlertPreference } from "@/lib/alerts";
 import { readJson } from "@/lib/auth";
 import { getConfig } from "@/lib/config";
+import type { RepeatPref } from "@/lib/remind";
 import type { DigestPref } from "@/lib/schedule";
 import {
   MAX_SUBSCRIBERS,
@@ -11,6 +12,7 @@ import {
   sanitizeAlerts,
   sanitizeDigest,
   sanitizeOffset,
+  sanitizeRepeat,
   saveSubscribers,
   subscriberCount,
   subscriberId,
@@ -23,6 +25,8 @@ type Body = {
   alerts?: AlertPreference;
   /** Personal alert point in cm; see OFFSET_CHOICES. */
   offsetCm?: number;
+  /** Minutes between reminders at each level; see REPEAT_CHOICES. */
+  repeat?: Partial<RepeatPref>;
   /** Endpoint this subscription replaces (browser rotated its subscription). */
   previousEndpoint?: string;
 };
@@ -65,6 +69,8 @@ export async function POST(req: Request) {
     alerts,
     offsetCm,
     alertState,
+    repeat: sanitizeRepeat(body.repeat, existing?.repeat),
+    lastAlertAt: existing?.lastAlertAt,
     createdAt: existing?.createdAt ?? now,
     // A new subscriber waits for the next slot instead of getting an update straight away.
     lastDigestAt: existing?.lastDigestAt ?? now,
@@ -73,7 +79,7 @@ export async function POST(req: Request) {
   };
   await saveSubscribers([sub]);
   return Response.json(
-    { digest: sub.digest, alerts: sub.alerts, offsetCm: sub.offsetCm },
+    { digest: sub.digest, alerts: sub.alerts, offsetCm: sub.offsetCm, repeat: sub.repeat },
     { headers: { "cache-control": "no-store" } },
   );
 }

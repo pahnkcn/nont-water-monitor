@@ -1086,6 +1086,26 @@ details.table-view[open] .disclosure {
   background: var(--ground);
 }
 
+/* Reminder rows: the level's shape in its colour, names wide enough that both selects line up. */
+.repeat-level {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 8.5em;
+}
+
+.repeat-level svg {
+  flex: none;
+}
+
+.repeat-level[data-level="watch"] svg {
+  color: var(--watch);
+}
+
+.repeat-level[data-level="danger"] svg {
+  color: var(--danger);
+}
+
 /* A line under a control: guidance in ink-2, or the live distance to the chosen point in ink. */
 .field-note {
   margin: var(--space-2) 0 0;
