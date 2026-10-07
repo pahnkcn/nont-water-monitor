@@ -35,7 +35,7 @@ describe("a round that overlaps other writes", () => {
     const unsubscribe = await import("@/app/api/push/unsubscribe/route");
     const me = await import("@/app/api/push/me/route");
     for (const who of ["CHANGER", "LEAVER"]) {
-      await subscribe.POST(post({ subscription: subscription(who), alerts: "watch", digest: { every: "1h", quiet: null } }));
+      await subscribe.POST(post({ subscription: subscription(who), digest: { every: "1h", quiet: null } }));
     }
 
     clock = Date.parse("2026-10-05T07:00:00+07:00"); // hourly updates due for both
@@ -43,7 +43,7 @@ describe("a round that overlaps other writes", () => {
     const send: TickDeps["send"] = async (): Promise<SendResult> => {
       if (!meddled) {
         meddled = true;
-        await subscribe.POST(post({ subscription: subscription("CHANGER"), offsetCm: -20 }));
+        await subscribe.POST(post({ subscription: subscription("CHANGER"), repeat: { watch: 120, danger: 30 } }));
         await unsubscribe.POST(post({ endpoint: subscription("LEAVER").endpoint }));
       }
       return { ok: true };
@@ -51,7 +51,7 @@ describe("a round that overlaps other writes", () => {
     await runTick(ORIGIN, clock, { capture: camera, send });
 
     const changer = await (await me.POST(post({ endpoint: subscription("CHANGER").endpoint }))).json();
-    expect(changer.offsetCm).toBe(-20);
+    expect(changer.repeat).toEqual({ watch: 120, danger: 30 });
     const leaver = await (await me.POST(post({ endpoint: subscription("LEAVER").endpoint }))).json();
     expect(leaver.subscribed).toBe(false);
   });

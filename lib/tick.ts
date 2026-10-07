@@ -1,4 +1,4 @@
-import { boundCeiling, personalThresholds, stepAlert, wantsEvent, type AlertEvent, type AlertState, type ReadingInput, type Thresholds } from "./alerts";
+import { boundCeiling, stepAlert, type AlertEvent, type ReadingInput, type Thresholds } from "./alerts";
 import { INITIAL_TRACKING, MAX_REFS, decideTracking, type TrackingDecision } from "./autotrack";
 import { captureFrames, type Capture } from "./capture";
 import { getConfig, type SiteConfig } from "./config";
@@ -7,7 +7,7 @@ import { judgeJump, type LevelAt } from "./jump";
 import { KEYS, kv } from "./kv";
 import { alertMessage, digestMessage, reminderMessage, snapshotImage, systemMessage, type PushMessage, type SystemNotice } from "./messages";
 import { mapLimit, sendPush } from "./push";
-import { DEFAULT_REPEAT, isReminderDue } from "./remind";
+import { isReminderDue } from "./remind";
 import { isDigestDue } from "./schedule";
 import {
   addReading,
@@ -20,6 +20,7 @@ import {
   logEvents,
   readingsSince,
   removeSubscribers,
+  repeatOf,
   resyncAlerts,
   setGaugeRefs,
   setSnapshot,
@@ -64,9 +65,7 @@ export async function runTick(origin: string, now = Date.now(), deps: TickDeps =
   try {
     const config = await getConfig();
     let state = await getState();
-    const siteAlertBefore = state.alert;
     let events: AlertEvent[] = [];
-    let reading: ReadingInput | null = null;
     const notices: SystemNotice[] = [];
     let readingInfo: TickResult["reading"];
     let error: string | undefined;
@@ -104,7 +103,7 @@ export async function runTick(origin: string, now = Date.now(), deps: TickDeps =
       } else if (read) {
         const taken = { t: read.t, level: read.level, confidence: r.confidence };
         await addReading({ ...taken, y: r.y ?? undefined, ...(estimate && { estimate }) });
-        reading = isBound(estimate) ? { ...taken, bound: true } : taken;
+        const reading: ReadingInput = isBound(estimate) ? { ...taken, bound: true } : taken;
         const stepped = stepAlert(state.alert, reading, config.thresholds);
         events = stepped.events;
         state = {
@@ -140,7 +139,7 @@ export async function runTick(origin: string, now = Date.now(), deps: TickDeps =
     }
 
     await setState(state);
-    await notify({ origin, now, state, siteAlertBefore, reading, events, notices, thresholds: config.thresholds, sent, send: deps.send });
+    await notify({ origin, now, state, events, notices, thresholds: config.thresholds, sent, send: deps.send });
     // Thresholds saved while this round ran: the states it just wrote follow the old ones.
     if (JSON.stringify(savedMeanwhile.thresholds) !== JSON.stringify(config.thresholds)) {
       await resyncAlerts(savedMeanwhile.thresholds, now);
@@ -198,9 +197,6 @@ async function notify(round: {
   origin: string;
   now: number;
   state: SiteState;
-  /** Site alert state before this round; stands in for devices that have no state of their own yet. */
-  siteAlertBefore: AlertState;
-  reading: ReadingInput | null;
   events: AlertEvent[];
   notices: SystemNotice[];
   thresholds: Thresholds;
@@ -221,36 +217,30 @@ async function notify(round: {
   type Job = { sub: Subscriber; msg: PushMessage; kind: "alerts" | "reminders" | "digests" | "system" };
   const jobs: Job[] = [];
   const updates = new Map<string, RoundUpdate>();
-  const update = (sub: Subscriber, patch: Omit<RoundUpdate, "id" | "offsetCm">) =>
-    updates.set(sub.id, { ...(updates.get(sub.id) ?? { id: sub.id, offsetCm: sub.offsetCm ?? 0 }), ...patch });
-  for (const sub of subs) {
-    const offsetCm = sub.offsetCm ?? 0;
-    let mine: AlertEvent[] = [];
-    // A round without a reading leaves the device where it was.
-    let current = sub.alertState ?? round.siteAlertBefore;
-    if (round.reading) {
-      // Each device has its own alert point, so each runs its own copy of the alert state machine.
-      const out = stepAlert(current, round.reading, personalThresholds(thresholds, offsetCm));
-      mine = out.events.filter((e) => wantsEvent(sub.alerts, e));
-      if (JSON.stringify(out.state) !== JSON.stringify(sub.alertState)) update(sub, { alertState: out.state });
-      current = out.state;
-    }
-    for (const e of mine) {
+  const update = (sub: Subscriber, patch: Omit<RoundUpdate, "id">) =>
+    updates.set(sub.id, { ...(updates.get(sub.id) ?? { id: sub.id }), ...patch });
+  // Every device hears once when the water reaches watch or danger, and when it falls back.
+  // Climbing further in danger is left to the reminders.
+  const alerts = round.events
+    .filter((e) => e.kind !== "rising")
+    .map((e) => {
       const estimate = summary.latest?.t === e.t ? summary.latest.estimate : undefined;
-      jobs.push({ sub, kind: "alerts", msg: alertMessage(e, thresholds, { snapshotUrl, trend: summary.trendCmPerHour, offsetCm, estimate }) });
-    }
+      return alertMessage(e, thresholds, { snapshotUrl, trend: summary.trendCmPerHour, estimate });
+    });
+  const status = state.alert.status;
+  for (const sub of subs) {
+    for (const msg of alerts) jobs.push({ sub, kind: "alerts", msg });
     let reminded = false;
-    if (mine.length) update(sub, { lastAlertAt: now });
-    else if (current.status !== "normal" && summary.latest) {
-      const repeat = sub.repeat ?? DEFAULT_REPEAT;
-      // Counted from the last alert, or from reaching this level without one (a point picked under the water).
-      const lastAlertAt = Math.max(sub.lastAlertAt ?? 0, current.since);
-      if (isReminderDue({ status: current.status, alerts: sub.alerts, repeat, quiet: sub.digest.quiet, lastAlertAt, now })) {
+    if (alerts.length) update(sub, { lastAlertAt: now });
+    else if (status !== "normal" && summary.latest) {
+      const repeat = repeatOf(sub);
+      // A device that subscribed with the water already up hears after a full interval, not straight away.
+      const lastAlertAt = Math.max(sub.lastAlertAt ?? 0, state.alert.since, sub.createdAt);
+      if (isReminderDue({ status, repeat, quiet: sub.digest.quiet, lastAlertAt, now })) {
         // While the camera is down this is the last level read, with its age.
-        const msg = reminderMessage(current.status, summary.latest, thresholds, {
-          everyMin: repeat[current.status],
+        const msg = reminderMessage(status, summary.latest, thresholds, {
+          everyMin: repeat[status],
           trend: summary.trendCmPerHour,
-          offsetCm,
           stale,
           lastFailureAt: state.failingSince,
           snapshotUrl,
@@ -262,7 +252,7 @@ async function notify(round: {
     }
     if (isDigestDue(sub.digest, sub.lastDigestAt, now)) {
       // An alert or reminder in the same round already carries the level; mark the slot as served.
-      if (!mine.length && !reminded) jobs.push({ sub, kind: "digests", msg: digest });
+      if (!alerts.length && !reminded) jobs.push({ sub, kind: "digests", msg: digest });
       update(sub, { lastDigestAt: now });
     }
     if (sub.admin) for (const msg of system) jobs.push({ sub, kind: "system", msg });

@@ -1,20 +1,16 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import type { AlertPreference } from "@/lib/alerts";
 import { inAppBrowser, type InAppBrowser } from "@/lib/inapp";
 import { DEFAULT_REPEAT, type RepeatPref } from "@/lib/remind";
 import type { DigestPref } from "@/lib/schedule";
 
-/**
- * `offsetCm` is the personal alert point against the site thresholds (OFFSET_CHOICES);
- * `repeat` the minutes between reminders at each level (REPEAT_CHOICES).
- */
-export type Prefs = { digest: DigestPref; alerts: AlertPreference; offsetCm: number; repeat: RepeatPref };
+/** `repeat` is the minutes between reminders at each level (REPEAT_CHOICES). */
+export type Prefs = { digest: DigestPref; repeat: RepeatPref };
 
 /** Settings as the server returned them; fills what an older response leaves out. */
-function toPrefs(d: Partial<Prefs> & Pick<Prefs, "digest" | "alerts">): Prefs {
-  return { digest: d.digest, alerts: d.alerts, offsetCm: d.offsetCm ?? 0, repeat: d.repeat ?? DEFAULT_REPEAT };
+function toPrefs(d: Partial<Prefs> & Pick<Prefs, "digest">): Prefs {
+  return { digest: d.digest, repeat: d.repeat ?? DEFAULT_REPEAT };
 }
 
 export type Platform = { ios: boolean; inApp: InAppBrowser | null };
@@ -110,9 +106,9 @@ export function usePush() {
           ? null
           : await post<{ subscribed: boolean } & Partial<Prefs>>("/api/push/me", { endpoint: sub.endpoint });
         if (cancelled) return;
-        if (res?.ok && res.data.subscribed && res.data.digest && res.data.alerts) {
+        if (res?.ok && res.data.subscribed && res.data.digest) {
           setEndpoint(sub.endpoint);
-          setPrefs(toPrefs({ ...res.data, digest: res.data.digest, alerts: res.data.alerts }));
+          setPrefs(toPrefs({ ...res.data, digest: res.data.digest }));
           setPhase("on");
         } else {
           // New subscription, or the server forgot this device: register it, keeping the old settings if any.

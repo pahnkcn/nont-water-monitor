@@ -4,7 +4,6 @@ import {
   INITIAL_ALERT_STATE,
   classify,
   stepAlert,
-  wantsEvent,
   type AlertEvent,
   type AlertState,
   type ReadingInput,
@@ -80,27 +79,6 @@ describe("stepAlert", () => {
     expect(rising).toHaveLength(2);
     expect(rising[0]).toEqual(expect.objectContaining({ level: 2.65, previous: 2.55 }));
     expect(rising[1]).toEqual(expect.objectContaining({ level: 2.81, previous: 2.65 }));
-  });
-});
-
-describe("wantsEvent", () => {
-  const up = (to: "watch" | "danger"): AlertEvent => ({ kind: "escalate", from: "normal", to, level: 2.3, t: 0 });
-  const down = (from: "watch" | "danger"): AlertEvent => ({ kind: "clear", from, to: "normal", level: 2, t: 0 });
-
-  it("danger-only subscribers skip watch alerts and watch all-clears", () => {
-    expect(wantsEvent("danger", up("watch"))).toBe(false);
-    expect(wantsEvent("danger", up("danger"))).toBe(true);
-    expect(wantsEvent("danger", down("watch"))).toBe(false);
-    expect(wantsEvent("danger", down("danger"))).toBe(true);
-  });
-
-  it("watch subscribers get everything", () => {
-    expect(wantsEvent("watch", up("watch"))).toBe(true);
-    expect(wantsEvent("watch", down("watch"))).toBe(true);
-  });
-
-  it("off gets nothing", () => {
-    expect(wantsEvent("off", up("danger"))).toBe(false);
   });
 });
 

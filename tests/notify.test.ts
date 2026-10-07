@@ -5,6 +5,7 @@ import type { RGBFrame } from "@/lib/gauge";
 import { DEFAULT_GAUGE_CONFIG } from "@/lib/gauge-config";
 import type { PushMessage } from "@/lib/messages";
 import type { PushTarget, SendResult } from "@/lib/push";
+import type { Subscriber } from "@/lib/store";
 import { FIXTURES, loadFrame, moveCamera } from "./frames";
 
 // One morning of 10-minute rounds through the real tick: tracker, gauge reader, alert state
@@ -59,6 +60,7 @@ const realNow = Date.now;
 const of = (who: string, tag?: string) => sent.filter((s) => s.to === who && (!tag || s.msg.tag === tag));
 const times = (list: Sent[]) => list.map((s) => hhmm(s.at));
 const titles = (list: Sent[]) => list.map((s) => s.msg.title);
+const reminder = (s: Sent) => s.msg.body.includes("ปรับหรือปิดได้ในหน้าเว็บ");
 
 beforeAll(async () => {
   Date.now = () => clock;
@@ -68,6 +70,7 @@ beforeAll(async () => {
 
   const subscribe = await import("@/app/api/push/subscribe/route");
   const adminNotify = await import("@/app/api/admin/notify/route");
+  const { saveSubscribers, subscriberId } = await import("@/lib/store");
   const { runTick } = await import("@/lib/tick");
 
   const night = readdirSync(FIXTURES)
@@ -83,18 +86,34 @@ beforeAll(async () => {
 
   const noRepeat = { watch: 0, danger: 0 };
   const devices = [
-    { who: "A", alerts: "watch", digest: { every: "1h", dailyHour: 7, quiet: null }, repeat: noRepeat },
-    { who: "B", alerts: "danger", digest: { every: "daily", dailyHour: 7, quiet: { start: 22, end: 6 } }, repeat: noRepeat },
-    { who: "C", alerts: "off", digest: { every: "3h" } },
-    { who: "D", alerts: "watch", digest: { every: "1h", quiet: null } },
-    { who: "E", alerts: "watch", digest: { every: "off" }, offsetCm: -20, repeat: noRepeat },
+    { who: "A", digest: { every: "1h", dailyHour: 7, quiet: null }, repeat: noRepeat },
+    { who: "B", digest: { every: "daily", dailyHour: 7, quiet: { start: 22, end: 6 } }, repeat: noRepeat },
+    { who: "D", digest: { every: "1h", quiet: null } },
     // Default reminders: every 30 minutes at watch, every 10 at danger.
-    { who: "R", alerts: "watch", digest: { every: "off" } },
+    { who: "R", digest: { every: "off" } },
   ];
   for (const d of devices) {
     const res = await subscribe.POST(post({ subscription: subscription(d.who), ...d }));
     if (res.status !== 200) throw new Error(`subscribe ${d.who}: ${res.status}`);
   }
+  // Saved back when each device picked the level its alerts started from, and a point of its own.
+  const old = (who: string, alerts: string, more: object): Subscriber =>
+    ({
+      id: subscriberId(subscription(who).endpoint),
+      target: subscription(who),
+      alerts,
+      createdAt: clock,
+      lastDigestAt: clock,
+      ...more,
+    }) as Subscriber;
+  await saveSubscribers([
+    old("C", "off", { digest: { every: "3h", dailyHour: 7, quiet: null } }),
+    old("E", "danger", {
+      digest: { every: "off", dailyHour: 7, quiet: null },
+      offsetCm: -20,
+      alertState: { status: "normal", since: clock, lastAlertLevel: null, pending: null },
+    }),
+  ]);
   const admin = await adminNotify.POST(post({ subscription: subscription("ADMIN"), on: true }, { "x-admin-password": "pw" }));
   if (admin.status !== 200) throw new Error(`admin notify: ${admin.status}`);
 
@@ -134,17 +153,24 @@ describe("a morning of rounds", () => {
     }
   });
 
-  it("sends the site alerts to the watch-level subscriber, and an hourly update otherwise", () => {
-    expect(titles(of("A", "alert"))).toEqual([
-      expect.stringMatching(/^เฝ้าระวัง: น้ำท่าน้ำนนท์เกินเกณฑ์ \d ซม\.$/),
-      expect.stringMatching(/^อันตราย: น้ำท่าน้ำนนท์เกินเกณฑ์ \d ซม\.$/),
-      expect.stringMatching(/^น้ำยังสูงขึ้น: สูงกว่าระดับอันตราย 1\d ซม\.$/),
-      "พ้นระดับอันตราย",
-      "กลับสู่ระดับปกติ",
-    ]);
-    expect(times(of("A", "alert"))).toEqual(["07:20", "08:30", "09:00", "09:50", "11:50"]);
-    // 09:00 is served by the alert in the same round
-    expect(times(of("A", "digest"))).toEqual(["06:00", "07:00", "08:00", "10:00", "11:00", "12:00"]);
+  it("alerts every device once at watch and once at danger, then when the water falls back", () => {
+    for (const who of ["A", "B", "C", "E", "R"]) {
+      const alerts = of(who, "alert").filter((s) => !reminder(s));
+      expect(times(alerts)).toEqual(["07:20", "08:30", "09:50", "11:50"]);
+      expect(titles(alerts)).toEqual([
+        expect.stringMatching(/^เฝ้าระวัง: น้ำท่าน้ำนนท์เกินเกณฑ์ \d ซม\.$/),
+        expect.stringMatching(/^อันตราย: น้ำท่าน้ำนนท์เกินเกณฑ์ \d ซม\.$/),
+        "พ้นระดับอันตราย",
+        "กลับสู่ระดับปกติ",
+      ]);
+    }
+    // Climbing another 10 cm in danger is in the log, but it is the reminders' to tell.
+    expect(ticks["09:00"].events).toEqual([expect.objectContaining({ kind: "rising" })]);
+  });
+
+  it("sends nothing more to a device with reminders off, and an hourly update otherwise", () => {
+    expect(of("A", "alert").filter(reminder)).toEqual([]);
+    expect(times(of("A", "digest"))).toEqual(["06:00", "07:00", "08:00", "09:00", "10:00", "11:00", "12:00"]);
   });
 
   it("holds an alert back for one round when the frames disagree", () => {
@@ -152,13 +178,13 @@ describe("a morning of rounds", () => {
     expect(ticks["08:30"].events).toEqual([expect.objectContaining({ kind: "escalate", to: "danger" })]);
   });
 
-  it("gives the danger-only subscriber danger alerts and the 07:00 update", () => {
-    expect(times(of("B", "alert"))).toEqual(["08:30", "09:00", "09:50"]);
+  it("gives the daily update at 07:00 and the alerts, nothing else", () => {
     expect(times(of("B", "digest"))).toEqual(["07:00"]);
+    expect(of("B").every((s) => s.msg.tag === "digest" || !reminder(s))).toBe(true);
   });
 
-  it("gives updates but no alerts to the subscriber who turned alerts off", () => {
-    expect(of("C", "alert")).toEqual([]);
+  it("alerts a device saved with alerts off, without reminders, and keeps its updates", () => {
+    expect(of("C", "alert").filter(reminder)).toEqual([]);
     expect(times(of("C", "digest"))).toEqual(["06:00", "09:00", "12:00"]);
   });
 
@@ -167,21 +193,15 @@ describe("a morning of rounds", () => {
     expect(ticks["06:00"].sent.removed).toBe(1);
   });
 
-  it("alerts the 20-cm-early subscriber 20 cm before each site threshold", () => {
-    const e = of("E", "alert");
-    expect(times(e).slice(0, 2)).toEqual(["06:30", "07:40"]);
-    expect(e[0].msg.title).toMatch(/^ใกล้ระดับเฝ้าระวัง: น้ำท่าน้ำนนท์อีก 1\d ซม\.$/);
-    expect(e[0].msg.body).toContain("จุดเตือนของคุณ: ก่อนถึงเกณฑ์ 20 ซม.");
-    expect(e[1].msg.title).toMatch(/^ใกล้ระดับอันตราย: น้ำท่าน้ำนนท์อีก 1\d ซม\.$/);
+  it("alerts a device saved with its own point at the site thresholds, and reminds it in danger only", () => {
+    expect(times(of("E", "alert").filter(reminder))).toEqual(["08:40", "08:50", "09:00", "09:10", "09:20", "09:30", "09:40"]);
   });
 
   it("reminds every 30 minutes at watch and every 10 at danger, counting from the last alert", () => {
     const r = of("R", "alert");
-    const reminder = (s: Sent) => s.msg.body.includes("ปรับหรือปิดได้ในหน้าเว็บ");
-    expect(times(r.filter((s) => !reminder(s)))).toEqual(["07:20", "08:30", "09:00", "09:50", "11:50"]);
     expect(times(r.filter(reminder))).toEqual([
       "07:50", "08:20", // watch
-      "08:40", "08:50", "09:10", "09:20", "09:30", "09:40", // danger; 09:00 is a rising alert
+      "08:40", "08:50", "09:00", "09:10", "09:20", "09:30", "09:40", // danger
       "10:20", "10:50", "11:20", // watch again, through the camera outage
     ]);
     expect(r.filter(reminder).every((s) => s.msg.tag === "alert" && s.msg.urgency === "high")).toBe(true);
@@ -208,7 +228,7 @@ describe("a morning of rounds", () => {
   });
 
   it("tells only the admin device about the camera, once per incident", () => {
-    // The admin device also got the dashboard defaults (daily 07:00 update, danger alerts).
+    // The admin device also got the dashboard defaults (daily 07:00 update, default reminders).
     expect(of("ADMIN", "system").map((s) => [hhmm(s.at), s.msg.tag, s.msg.title])).toEqual([
       ["10:10", "system", "ปรับตำแหน่งไม้วัดอัตโนมัติแล้ว"],
       ["11:10", "system", "อ่านค่าจากกล้องไม่ได้ 1 ชั่วโมง"],

@@ -1,6 +1,6 @@
-// Reminders while the water stays at or over a device's alert point.
+// Reminders while the water stays at watch or danger.
 
-import { rank, type AlertPreference, type Status } from "./alerts";
+import type { Status } from "./alerts";
 import { bangkokHour, inQuietHours, type DigestPref } from "./schedule";
 
 /** Minutes between reminders at each level; 0 sends none. */
@@ -18,19 +18,18 @@ export const DEFAULT_REPEAT: RepeatPref = { watch: 30, danger: 10 };
 const SLACK_MS = 3 * 60 * 1000;
 
 /**
- * Whether a device still at `status` should hear again. `lastAlertAt` is the later of the last
- * alert or reminder it was sent and the moment it reached `status`. Quiet hours hold back watch
- * reminders only; danger ones always go.
+ * Whether a device should hear again while the site stays at `status`. `lastAlertAt` is the
+ * latest of the last alert or reminder it was sent, the moment the site reached `status` and when
+ * the device subscribed. Quiet hours hold back watch reminders only; danger ones always go.
  */
 export function isReminderDue(o: {
   status: Status;
-  alerts: AlertPreference;
   repeat: RepeatPref;
   quiet: DigestPref["quiet"];
   lastAlertAt: number;
   now: number;
 }): boolean {
-  if (o.status === "normal" || o.alerts === "off" || rank(o.status) < rank(o.alerts)) return false;
+  if (o.status === "normal") return false;
   const minutes = o.repeat[o.status];
   if (!minutes) return false;
   if (o.status === "watch" && inQuietHours(bangkokHour(o.now), o.quiet)) return false;

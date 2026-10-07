@@ -1,9 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { OFFSET_CHOICES, personalThresholds, pointAhead, type AlertPreference } from "@/lib/alerts";
-import { STATUS_LABEL, cmBetween, formatEvery, formatOffset, thresholdGap, toGoWord } from "@/lib/format";
-import type { Estimate } from "@/lib/summary";
+import { STATUS_LABEL, formatEvery } from "@/lib/format";
 import { externalBrowserUrl, type InAppBrowser } from "@/lib/inapp";
 import { REPEAT_CHOICES, type RepeatPref } from "@/lib/remind";
 import type { DigestEvery, DigestPref } from "@/lib/schedule";
@@ -26,49 +24,19 @@ function digestSummary(d: DigestPref) {
   return `ข่าวระดับน้ำ${EVERY_LABEL[d.every]}`;
 }
 
-function alertSummary(a: AlertPreference, offsetCm: number) {
-  if (a === "off") return "ไม่รับการเตือนภัย";
-  const what = a === "watch" ? "เตือนทันทีตั้งแต่ระดับเฝ้าระวัง" : "เตือนทันทีเมื่อถึงระดับอันตราย";
-  return offsetCm ? `${what} (${formatOffset(offsetCm)})` : what;
-}
+/** Every device gets these; only the reminders after them can be changed. */
+const ALERT_SUMMARY = "เตือนทันทีเมื่อน้ำถึงระดับเฝ้าระวังและอันตราย";
 
 /** "เตือนซ้ำทุก 10 นาทีจนน้ำลด", naming the levels only when they repeat differently. */
-function repeatSummary(a: AlertPreference, r: RepeatPref) {
-  if (a === "off") return null;
-  const watch = a === "watch" ? r.watch : 0;
-  if (!watch && !r.danger) return "ไม่เตือนซ้ำ";
-  if (a === "danger" || watch === r.danger) return `เตือนซ้ำ${formatEvery(r.danger)}จนน้ำลด`;
-  if (!r.danger) return `เตือนซ้ำเฉพาะระดับเฝ้าระวัง ${formatEvery(watch)}`;
-  if (!watch) return `เตือนซ้ำเฉพาะระดับอันตราย ${formatEvery(r.danger)}`;
-  return `เตือนซ้ำระดับเฝ้าระวัง${formatEvery(watch)} อันตราย${formatEvery(r.danger)}`;
+function repeatSummary(r: RepeatPref) {
+  if (!r.watch && !r.danger) return "ไม่เตือนซ้ำ";
+  if (r.watch === r.danger) return `เตือนซ้ำ${formatEvery(r.danger)}จนน้ำลด`;
+  if (!r.danger) return `เตือนซ้ำเฉพาะระดับเฝ้าระวัง ${formatEvery(r.watch)}`;
+  if (!r.watch) return `เตือนซ้ำเฉพาะระดับอันตราย ${formatEvery(r.danger)}`;
+  return `เตือนซ้ำระดับเฝ้าระวัง${formatEvery(r.watch)} อันตราย${formatEvery(r.danger)}`;
 }
 
 const repeatLabel = (minutes: number) => (minutes ? formatEvery(minutes) : "ไม่เตือนซ้ำ");
-
-/** How far the water is from the next point this device will be alerted at. */
-function distanceToMine(level: number, estimate: Estimate | undefined, prefs: Prefs, watch: number, danger: number) {
-  const mine = personalThresholds({ watch, danger, hysteresis: 0, repeatStep: 0 }, prefs.offsetCm);
-  const gap =
-    prefs.alerts === "danger" && level < mine.danger
-      ? { cm: Math.max(1, Math.round((mine.danger - level) * 100)), target: "danger" as const, over: false, estimate }
-      : thresholdGap(level, mine, estimate);
-  if (gap.over) return `ตอนนี้น้ำสูงกว่าจุดเตือนอันตรายของคุณ ${gap.cm} ซม.`;
-  return `ตอนนี้${toGoWord(gap.estimate)} ${gap.cm} ซม. ถึงจุดเตือน${STATUS_LABEL[gap.target]}ของคุณ`;
-}
-
-/**
- * Under a point the water is already over: no first alert will come, so say what will.
- * The line above already says when the water is over the danger point.
- */
-function passedNote(level: number, prefs: Prefs, watch: number, danger: number) {
-  const mine = personalThresholds({ watch, danger, hysteresis: 0, repeatStep: 0 }, prefs.offsetCm);
-  const status = Math.round(level * 100) >= Math.round(mine.danger * 100) ? "danger" : "watch";
-  const every = prefs.repeat[status];
-  const passed = status === "watch" ? "น้ำเลยจุดเตือนเฝ้าระวังของคุณแล้ว " : "";
-  return every
-    ? `${passed}จะได้เตือนซ้ำ${formatEvery(every)}จนน้ำลด`
-    : `${passed}ปิดเตือนซ้ำไว้ จะได้แจ้งอีกครั้งเมื่อน้ำลดพ้นจุดนี้`;
-}
 
 function Message({ push }: { push: PushApi }) {
   return (
@@ -153,9 +121,7 @@ export function NotifyCta({ push }: { push: PushApi }) {
           <BellIcon />
           <span>
             <strong>แจ้งเตือนเปิดอยู่:</strong>{" "}
-            {[digestSummary(prefs.digest), alertSummary(prefs.alerts, prefs.offsetCm), repeatSummary(prefs.alerts, prefs.repeat)]
-              .filter(Boolean)
-              .join(" · ")}{" "}
+            {[digestSummary(prefs.digest), ALERT_SUMMARY, repeatSummary(prefs.repeat)].join(" · ")}{" "}
             <a href="#notify">ปรับการแจ้งเตือน</a>
           </span>
         </p>
@@ -211,7 +177,7 @@ export function NotifyCta({ push }: { push: PushApi }) {
         {phase === "working" ? "กำลังเปิดการแจ้งเตือน…" : "เปิดการแจ้งเตือน"}
       </button>
       <p className="facts quiet" style={{ marginTop: 8 }}>
-        ได้ข่าวระดับน้ำทุกเช้า 07:00 น. เตือนทันทีเมื่อน้ำถึงระดับอันตราย และเตือนซ้ำทุก 10 นาทีจนน้ำลด ปรับได้หลังเปิด
+        ได้ข่าวระดับน้ำทุกเช้า 07:00 น. เตือนทันทีเมื่อน้ำถึงระดับเฝ้าระวังและอันตราย และเตือนซ้ำจนน้ำลด ปรับได้หลังเปิด
       </p>
       <Message push={push} />
     </div>
@@ -219,23 +185,7 @@ export function NotifyCta({ push }: { push: PushApi }) {
 }
 
 /** Full preferences, shown once this device is subscribed. */
-export function NotifySettings({
-  push,
-  watch,
-  danger,
-  latestLevel,
-  latestEstimate,
-  provisional,
-}: {
-  push: PushApi;
-  watch: number;
-  danger: number;
-  /** Latest reading on the gauge scale, used only to say how far the chosen point is. */
-  latestLevel: number | null;
-  /** How latestLevel was estimated, when it was not a clean read. */
-  latestEstimate?: Estimate;
-  provisional?: boolean;
-}) {
+export function NotifySettings({ push, provisional }: { push: PushApi; provisional?: boolean }) {
   const mark = provisional ? " (เกณฑ์ชั่วคราว)" : "";
   const { phase, prefs } = push;
 
@@ -271,17 +221,6 @@ export function NotifySettings({
     </label>
   );
 
-  // Any point can be picked. One the water is already over starts there without an alert;
-  // the options say so, and reminders keep coming until the water falls.
-  const th = { watch, danger };
-  const ahead = (o: number) => pointAhead(latestLevel, th, prefs.alerts, o);
-  const setAlerts = (alerts: AlertPreference) => set({ alerts });
-  const offsetOption = (o: number) => (
-    <option key={o} value={o}>
-      {ahead(o) ? formatOffset(o) : `${formatOffset(o)} (น้ำเลยจุดนี้แล้ว)`}
-    </option>
-  );
-
   return (
     <form onSubmit={(e) => e.preventDefault()}>
       <fieldset className="field">
@@ -315,75 +254,16 @@ export function NotifySettings({
       </fieldset>
 
       <fieldset className="field">
-        <legend>เตือนทันทีเมื่อน้ำถึง</legend>
-        <p className="hint">ได้แจ้งอีกครั้งเมื่อน้ำลดพ้นระดับที่เคยเตือน</p>
-        <div className="choices">
-          <label className="choice">
-            <input
-              type="radio"
-              name="alerts"
-              checked={prefs.alerts === "watch"}
-              onChange={() => setAlerts("watch")}
-            />
-            <span>
-              ระดับเฝ้าระวัง
-              <small>และระดับอันตราย{mark}</small>
-            </span>
-          </label>
-          <label className="choice">
-            <input
-              type="radio"
-              name="alerts"
-              checked={prefs.alerts === "danger"}
-              onChange={() => setAlerts("danger")}
-            />
-            <span>
-              ระดับอันตรายเท่านั้น
-              <small className="num">
-                สูงกว่าระดับเฝ้าระวัง {cmBetween(danger, watch)} ซม.{mark}
-              </small>
-            </span>
-          </label>
-          <label className="choice">
-            <input type="radio" name="alerts" checked={prefs.alerts === "off"} onChange={() => setAlerts("off")} />
-            <span>
-              ไม่รับการเตือนภัย
-              <small>รับเฉพาะข่าวตามรอบ</small>
-            </span>
-          </label>
-        </div>
-        {prefs.alerts !== "off" && (
-          <>
-            <label className="inline-select">
-              <span>จุดเตือนของเครื่องนี้</span>
-              <select value={prefs.offsetCm} onChange={(e) => set({ offsetCm: Number(e.target.value) })}>
-                <optgroup label="เตือนก่อนน้ำถึงเกณฑ์">{OFFSET_CHOICES.filter((o) => o < 0).map(offsetOption)}</optgroup>
-                {offsetOption(0)}
-                <optgroup label="เตือนเมื่อน้ำเกินเกณฑ์ไปแล้ว">{OFFSET_CHOICES.filter((o) => o > 0).map(offsetOption)}</optgroup>
-              </select>
-            </label>
-            {latestLevel !== null && (
-              <p className="field-note num" data-live="">
-                {distanceToMine(latestLevel, latestEstimate, prefs, watch, danger)}
-              </p>
-            )}
-            {latestLevel !== null && !ahead(prefs.offsetCm) && (
-              <p className="field-note">{passedNote(latestLevel, prefs, watch, danger)}</p>
-            )}
-          </>
-        )}
+        <legend>เตือนซ้ำจนกว่าน้ำจะลด</legend>
+        <p className="hint">
+          ทุกเครื่องได้เตือนทันทีเมื่อน้ำถึงระดับเฝ้าระวังและระดับอันตราย ระดับละ 1 ครั้ง{mark}{" "}
+          จากนั้นส่งซ้ำตามรอบที่เลือกจนน้ำลดต่ำกว่าเกณฑ์ และแจ้งอีกครั้งเมื่อน้ำลด
+        </p>
+        {repeatSelect("watch")}
+        {repeatSelect("danger")}
       </fieldset>
 
-      {prefs.alerts !== "off" && (
-        <fieldset className="field">
-          <legend>เตือนซ้ำจนกว่าน้ำจะลด</legend>
-          <p className="hint">ส่งซ้ำตามรอบที่เลือก จนน้ำลดต่ำกว่าจุดเตือนของคุณ</p>
-          {prefs.alerts === "watch" && repeatSelect("watch")}
-          {repeatSelect("danger")}
-        </fieldset>
-      )}
-
-      {push.platform.ios && prefs.alerts !== "off" && <FocusNote />}
+      {push.platform.ios && <FocusNote />}
 
       <fieldset className="field">
         <legend>ช่วงเวลาไม่รบกวน</legend>
