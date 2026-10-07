@@ -1,8 +1,11 @@
 // A reading the river could not have reached is something crossing the gauge (a person, a pole,
 // a boat, rain on the dome), not water. Hold it back until the next round says the same.
 
-/** A level read on one calibration; levels from different calibrations do not compare. */
-export type LevelAt = { t: number; level: number; calibration: number };
+/**
+ * A level read on one calibration; levels from different calibrations do not compare. A `bound`
+ * is only the most the water can be: plants hid it, or it fell below the rows the reader scans.
+ */
+export type LevelAt = { t: number; level: number; calibration: number; bound?: boolean };
 
 /**
  * "accept": within reach of the last accepted level. "confirm": out of reach, but the round
@@ -19,10 +22,14 @@ const MAX_RATE_M_PER_HOUR = 0.4;
 /** The reader's own wobble between rounds, more on the shaded foot of the gauge. */
 const SLACK_M = 0.1;
 
+/** The lowest the water can be on a reading: a bound reaches all the way down. */
+const lowest = (x: LevelAt) => (x.bound ? -Infinity : x.level);
+
 /** Could the water have gone from `a` to `b`? */
 function within(a: LevelAt, b: LevelAt) {
   const hours = Math.abs(b.t - a.t) / HOUR;
-  return Math.abs(b.level - a.level) <= SLACK_M + MAX_RATE_M_PER_HOUR * hours + 1e-9;
+  const gap = Math.max(0, lowest(a) - b.level, lowest(b) - a.level);
+  return gap <= SLACK_M + MAX_RATE_M_PER_HOUR * hours + 1e-9;
 }
 
 export function judgeJump(cur: LevelAt, last: LevelAt | null, held: LevelAt | null): JumpVerdict {

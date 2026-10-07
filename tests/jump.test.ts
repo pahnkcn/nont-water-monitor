@@ -36,6 +36,32 @@ describe("judgeJump", () => {
     expect(judgeJump(at(360, 2.3), at(60, 0.83), null)).toBe("accept");
   });
 
+  // The live site on 2026-10-07: water hyacinth hid the water under 0.89 m until 09:30, then the
+  // river showed at 0.72 m at 09:40 and was held back as a 17 cm drop in ten minutes.
+  const bkk = (s: string, level: number, bound = false) => ({
+    t: Date.parse(`2026-10-07T${s}:00+07:00`),
+    level,
+    calibration: 0,
+    ...(bound && { bound }),
+  });
+
+  it("takes water anywhere under a level that was only the most it could be", () => {
+    expect(judgeJump(bkk("09:40", 0.72), bkk("09:30", 0.89, true), null)).toBe("accept");
+    expect(judgeJump(bkk("09:40", 0.4), bkk("09:30", 0.89, true), null)).toBe("accept");
+    expect(judgeJump(bkk("09:40", 0.6, true), bkk("09:30", 0.89, true), null)).toBe("accept");
+  });
+
+  it("still holds water out of reach above such a level", () => {
+    expect(judgeJump(bkk("09:40", 1.2), bkk("09:30", 0.89, true), null)).toBe("hold");
+  });
+
+  it("holds a ceiling far under the last level, and confirms it under a held one", () => {
+    // 07:48: plants hid the water under 0.95 m while the last level was the 2.13 m misread at 07:40
+    expect(judgeJump(bkk("07:48", 0.95, true), bkk("07:40", 2.13), null)).toBe("hold");
+    expect(judgeJump(bkk("07:50", 0.97, true), bkk("07:40", 2.13), bkk("07:48", 0.95, true))).toBe("confirm");
+    expect(judgeJump(bkk("07:50", 2.5, true), bkk("07:40", 2.13), null)).toBe("accept");
+  });
+
   it("accepts the first reading there is", () => {
     expect(judgeJump(at(60, 2.54), null, null)).toBe("accept");
   });
