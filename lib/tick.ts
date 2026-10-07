@@ -80,7 +80,9 @@ export async function runTick(origin: string, now = Date.now(), deps: TickDeps =
       // Plants reaching the watch line hide whether the water got there too.
       const hidden = r.ok && r.covered && r.level !== null && r.level >= boundCeiling(config.thresholds);
       const read: LevelAt | null =
-        r.ok && r.level !== null && !hidden ? { t: cap.capturedAt, level: r.level, calibration: config.calibration } : null;
+        r.ok && r.level !== null && !hidden
+          ? { t: cap.capturedAt, level: r.level, calibration: config.calibration, ...(isBound(estimate) && { bound: true }) }
+          : null;
       const held = read !== null && judgeJump(read, state.lastGood, state.held) === "hold";
       const reason = held ? "jump" : hidden ? "covered" : r.reason;
       readingInfo = { level: r.level, confidence: r.confidence, reason, y: r.y, estimate };
