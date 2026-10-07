@@ -1,5 +1,5 @@
 import type { Status, Thresholds } from "./alerts";
-import type { Estimate } from "./summary";
+import { isBound, type Estimate } from "./summary";
 import type { Transform } from "./track";
 
 export const STATUS_LABEL: Record<Status, string> = {
@@ -17,6 +17,7 @@ export const REASON_LABEL: Record<string, string> = {
   "gauge-lost": "หาไม้วัดในภาพไม่เจอ",
   "frames-disagree": "ภาพแต่ละเฟรมไม่ตรงกัน",
   "weak-edge": "ขอบผิวน้ำไม่ชัด",
+  covered: "ผักตบชวาหรือของลอยน้ำบังผิวน้ำเหนือระดับเฝ้าระวัง",
   "camera-moved": "กล้องเพิ่งขยับ รอยืนยัน",
   jump: "ต่างจากรอบก่อนเกินกว่าน้ำจะขึ้นลงได้ พักไว้รอยืนยัน",
   unreadable: "อ่านค่าไม่ได้",
@@ -32,13 +33,13 @@ export type Gap = {
   target: "watch" | "danger";
   /** True once the water is at or over danger; cm then counts how far over. */
   over: boolean;
-  /** Set when the level was only estimated: cm is then about right ("approx") or a floor ("below"). */
+  /** Set when the level was only estimated: cm is then about right ("approx") or a floor ("below", "covered"). */
   estimate?: Estimate;
 };
 
 /** Distance from a level to the next threshold above it, or past danger. */
 export function thresholdGap(level: number, th: Pick<Thresholds, "watch" | "danger">, estimate?: Estimate): Gap {
-  // Estimates only happen far down the gauge, never over danger.
+  // Estimates only happen low on the gauge (lib/tick.ts refuses a bound any higher), never over danger.
   if (level >= th.danger) return { cm: Math.round((level - th.danger) * 100), target: "danger", over: true };
   const target = level < th.watch ? "watch" : "danger";
   // Never "0 cm to go" while still below the line.
@@ -48,7 +49,7 @@ export function thresholdGap(level: number, th: Pick<Thresholds, "watch" | "dang
 
 /** "อีก" / "อีกประมาณ" / "อีกมากกว่า" in front of a distance still to go. */
 export function toGoWord(estimate?: Estimate) {
-  return estimate === "below" ? "อีกมากกว่า" : estimate === "approx" ? "อีกประมาณ" : "อีก";
+  return isBound(estimate) ? "อีกมากกว่า" : estimate === "approx" ? "อีกประมาณ" : "อีก";
 }
 
 /** "อีก 85 ซม. ถึงระดับเฝ้าระวัง" / "อีกประมาณ 144 ซม. ถึงระดับเฝ้าระวัง" / "สูงกว่าระดับอันตราย 12 ซม." */

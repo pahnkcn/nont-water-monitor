@@ -24,6 +24,14 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
  */
 export const OFFSET_CHOICES = [-50, -30, -20, -10, 0, 10, 20, 30] as const;
 
+/**
+ * The highest a bound (the water hidden somewhere under it) is worth keeping at: under the site's
+ * watch level and every device's danger point, where "more than … cm to go" is still true.
+ */
+export function boundCeiling(th: Pick<Thresholds, "watch" | "danger">) {
+  return Math.min(th.watch, th.danger + Math.min(...OFFSET_CHOICES) / 100);
+}
+
 /** Both thresholds moved by the subscriber's offset. */
 export function personalThresholds(th: Thresholds, offsetCm: number): Thresholds {
   const move = (v: number) => Math.round(v * 100 + offsetCm) / 100;
@@ -60,7 +68,13 @@ export const INITIAL_ALERT_STATE: AlertState = {
   pending: null,
 };
 
-export type ReadingInput = { t: number; level: number; confidence: "high" | "low" };
+export type ReadingInput = {
+  t: number;
+  level: number;
+  confidence: "high" | "low";
+  /** The level is only the most the water can be (it is hidden lower down). */
+  bound?: boolean;
+};
 
 export type AlertEvent =
   | { kind: "escalate"; from: Status; to: Status; level: number; t: number }
@@ -92,6 +106,7 @@ export function initialPersonalState(level: number | null, th: Thresholds, now: 
  * Advance the alert state by one reading.
  * Going up: one confident reading is enough; a low-confidence one needs a second in a row.
  * Going down: two confident readings in a row. Low-confidence readings never clear an alert.
+ * A bound can take the state down (the water is at most that high) but never up.
  */
 export function stepAlert(
   state: AlertState,
@@ -107,6 +122,7 @@ export function stepAlert(
     if (
       state.status === "danger" &&
       reading.confidence === "high" &&
+      !reading.bound &&
       lastAlertLevel !== null &&
       level >= lastAlertLevel + th.repeatStep - 1e-9
     ) {
@@ -117,6 +133,7 @@ export function stepAlert(
   }
 
   const up = rank(target) > rank(state.status);
+  if (up && reading.bound) return { state, events: [] };
   if (!up && reading.confidence === "low") return { state, events: [] };
 
   const needed = up ? (reading.confidence === "high" ? 1 : 2) : 2;

@@ -19,7 +19,10 @@ type Props = {
   snapshotAt: number | null;
   /** Row where the reader found the waterline in that snapshot. */
   lineY: number | null;
-  /** "below": no water on any row scanned, so lineY is the last of them and the water is under it. */
+  /**
+   * "below": no water on any row scanned, so lineY is the last of them and the water is under it.
+   * "covered": plants or something afloat hide the gauge from lineY down, and the water is under it.
+   */
   estimate?: Estimate;
   /** Rows of the watch and danger levels in that snapshot; null while the gauge is lost. */
   thresholdRows?: ThresholdRows | null;
@@ -29,6 +32,7 @@ type Props = {
 
 export function CameraPanel({ snapshotAt, lineY, estimate, thresholdRows, provisional }: Props) {
   const below = estimate === "below";
+  const covered = estimate === "covered";
   const approx = estimate === "approx";
   const [live, setLive] = useState(false);
   const [liveState, setLiveState] = useState<"loading" | "playing" | "error">("loading");
@@ -134,7 +138,15 @@ export function CameraPanel({ snapshotAt, lineY, estimate, thresholdRows, provis
             ))}
             {linePct !== null && (
               <div className="camera__line" style={{ top: `${linePct}%` }}>
-                <span>{below ? "ผิวน้ำต่ำกว่าเส้นนี้" : approx ? "ผิวน้ำโดยประมาณ · อาจคลาดเคลื่อน" : "ผิวน้ำที่ระบบอ่านได้"}</span>
+                <span>
+                  {below
+                    ? "ผิวน้ำต่ำกว่าเส้นนี้"
+                    : covered
+                      ? "มีสิ่งบังไม้วัด · ผิวน้ำต่ำกว่าเส้นนี้"
+                      : approx
+                        ? "ผิวน้ำโดยประมาณ · อาจคลาดเคลื่อน"
+                        : "ผิวน้ำที่ระบบอ่านได้"}
+                </span>
               </div>
             )}
             {/* After the waterline, so its dashes never run through a tag. */}
@@ -160,6 +172,11 @@ export function CameraPanel({ snapshotAt, lineY, estimate, thresholdRows, provis
               <strong>เส้นนี้เป็นค่าประมาณ</strong> ช่วงล่างของไม้วัดอยู่ในเงาและมีตัวเลขบัง ตำแหน่งเส้นอาจคลาดจากผิวน้ำจริงเล็กน้อย
               กดดูภาพสดเพื่อเทียบได้
             </>
+          ) : covered ? (
+            <>
+              <strong>เส้นนี้ไม่ใช่ผิวน้ำ</strong> ผักตบชวาหรือของลอยน้ำบังไม้วัดตั้งแต่เส้นนี้ลงไป น้ำอยู่ต่ำกว่าเส้นนี้
+              แต่บอกไม่ได้ว่าต่ำกว่าเท่าไร
+            </>
           ) : (
             <>
               <strong>เส้นนี้ไม่ใช่ผิวน้ำ</strong> ระบบไม่พบผิวน้ำจนถึงแถวล่างสุดที่อ่าน น้ำอยู่ต่ำกว่าเส้นนี้
@@ -178,7 +195,9 @@ export function CameraPanel({ snapshotAt, lineY, estimate, thresholdRows, provis
             ? "ใช้อินเทอร์เน็ตราว 2 MB ต่อนาที"
             : below
               ? "เส้นประสีเหลืองคือแถวล่างสุดที่ระบบอ่านบนไม้วัด ผิวน้ำอยู่ต่ำกว่านั้น"
-              : approx
+              : covered
+                ? "เส้นประสีเหลืองคือจุดที่ไม้วัดเริ่มถูกบัง ผิวน้ำอยู่ต่ำกว่านั้น"
+                : approx
                 ? "เส้นประสีเหลืองคือผิวน้ำโดยประมาณที่ระบบตรวจพบบนไม้วัด"
                 : "เส้นประสีเหลืองคือผิวน้ำที่ระบบตรวจพบบนไม้วัด"}
           {railNote && ` ${railNote}${provisional ? " (*เกณฑ์ชั่วคราว)" : ""}`}{" "}

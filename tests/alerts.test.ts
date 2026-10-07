@@ -103,3 +103,33 @@ describe("wantsEvent", () => {
     expect(wantsEvent("off", up("danger"))).toBe(false);
   });
 });
+
+describe("a bound: the water hidden somewhere under the level", () => {
+  const bound = (level: number, i: number): ReadingInput => ({ t: i * 600_000, level, confidence: "high", bound: true });
+  const step = (start: AlertState, levels: number[]) => {
+    let state = start;
+    const events: AlertEvent[] = [];
+    levels.forEach((l, i) => {
+      const out = stepAlert(state, bound(l, i + 1), TH);
+      state = out.state;
+      events.push(...out.events);
+    });
+    return { state, events };
+  };
+
+  it("never raises an alert, however high it sits", () => {
+    const { state, events } = step(INITIAL_ALERT_STATE, [2.6, 2.6, 2.6]);
+    expect(state.status).toBe("normal");
+    expect(events).toEqual([]);
+  });
+
+  it("sends no repeat alert while in danger", () => {
+    expect(step(run([2.55]).state, [2.9]).events).toEqual([]);
+  });
+
+  it("clears an alert once two in a row are under the line", () => {
+    const { state, events } = step(run([2.55]).state, [1.5, 1.5]);
+    expect(state.status).toBe("normal");
+    expect(events).toMatchObject([{ kind: "clear", from: "danger", to: "normal", level: 1.5 }]);
+  });
+});

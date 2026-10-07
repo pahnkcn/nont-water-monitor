@@ -133,7 +133,9 @@ export function AdminPanel() {
           ? "อ่านค่าไม่ได้"
           : d.reading.estimate === "below"
             ? `น้ำต่ำกว่าช่วงที่อ่านได้ (ต่ำกว่า ${d.reading.level.toFixed(2)} ม. ตามสเกลไม้วัด)`
-            : `อ่านได้${d.reading.estimate === "approx" ? "ประมาณ" : ""} ${d.reading.level.toFixed(2)} ม. ตามสเกลไม้วัด`;
+            : d.reading.estimate === "covered"
+              ? `มีสิ่งบังผิวน้ำ (น้ำต่ำกว่า ${d.reading.level.toFixed(2)} ม. ตามสเกลไม้วัด)`
+              : `อ่านได้${d.reading.estimate === "approx" ? "ประมาณ" : ""} ${d.reading.level.toFixed(2)} ม. ตามสเกลไม้วัด`;
       await load(password);
       setMsg({
         text: `${read} (ความมั่นใจ ${d.reading?.confidence ?? "-"}${reason}) · ส่งเตือน ${d.sent.alerts} · เตือนซ้ำ ${d.sent.reminders} · ข่าวตามรอบ ${d.sent.digests} · ถึงผู้ดูแล ${d.sent.system}`,
@@ -218,7 +220,7 @@ export function AdminPanel() {
           <li>
             อ่านล่าสุด:{" "}
             {state.lastRead
-              ? `${formatDateTime(state.lastRead.t)} ${state.lastRead.ok ? `${state.lastRead.estimate === "below" ? "ต่ำกว่า " : state.lastRead.estimate === "approx" ? "ประมาณ " : ""}${state.lastRead.level?.toFixed(2)} ม. (${state.lastRead.confidence})` : `ไม่สำเร็จ: ${REASON_LABEL[state.lastRead.reason ?? ""] ?? state.lastRead.reason}`}`
+              ? `${formatDateTime(state.lastRead.t)} ${state.lastRead.ok ? `${state.lastRead.estimate === "below" || state.lastRead.estimate === "covered" ? "ต่ำกว่า " : state.lastRead.estimate === "approx" ? "ประมาณ " : ""}${state.lastRead.level?.toFixed(2)} ม. (${state.lastRead.confidence})` : `ไม่สำเร็จ: ${REASON_LABEL[state.lastRead.reason ?? ""] ?? state.lastRead.reason}`}`
               : "ยังไม่เคยอ่าน"}
           </li>
           <li>อ่านไม่สำเร็จติดกัน: {state.failureStreak} รอบ</li>
@@ -349,6 +351,8 @@ export function AdminPanel() {
                   <span>
                     {data.snapshot.estimate === "below"
                       ? `ไม่พบน้ำถึงแถวสุดท้ายที่อ่าน (${data.snapshot.y})`
+                      : data.snapshot.estimate === "covered"
+                        ? `ไม้วัดถูกบังตั้งแต่แถว ${data.snapshot.y} น้ำอยู่ต่ำกว่านั้น`
                       : `ผิวน้ำที่ตรวจพบ แถว ${data.snapshot.y}${data.snapshot.estimate === "approx" ? " (ช่วงล่าง ค่าประมาณ)" : ""}`}
                   </span>
                 </div>
@@ -431,7 +435,7 @@ type DevicePhase = "checking" | "unsupported" | "off" | "on" | "working";
 
 /** Lets the admin's own phone receive camera and tracking notices. */
 const metres = (s: { level: number; estimate?: Suspect["estimate"] }) =>
-  `${s.estimate === "below" ? "ต่ำกว่า " : s.estimate === "approx" ? "ประมาณ " : ""}${s.level.toFixed(2)} ม.`;
+  `${s.estimate === "below" || s.estimate === "covered" ? "ต่ำกว่า " : s.estimate === "approx" ? "ประมาณ " : ""}${s.level.toFixed(2)} ม.`;
 
 /** Rounds held back as jumps or read with low confidence, each with the picture the reader saw. */
 function SuspectRounds({ suspects, password }: { suspects: Suspect[]; password: string }) {

@@ -1,7 +1,7 @@
 import type { AlertEvent, Status, Thresholds } from "./alerts";
 import type { TrackingNotice } from "./autotrack";
 import { REASON_LABEL, STATUS_LABEL, cmBetween, describeMove, formatEvery, formatGap, formatOffset, formatTime, formatTrend } from "./format";
-import type { StoredReading, Summary } from "./summary";
+import type { Estimate, StoredReading, Summary } from "./summary";
 
 export type PushMessage = {
   title: string;
@@ -55,7 +55,8 @@ function readAt(t: number, stale: boolean, lastFailureAt: number | null) {
 export function alertMessage(
   e: AlertEvent,
   th: Thresholds,
-  opts: { snapshotUrl?: string; trend: number | null; offsetCm?: number },
+  /** `estimate`: how the level of the round that raised `e` was read. */
+  opts: { snapshotUrl?: string; trend: number | null; offsetCm?: number; estimate?: Estimate },
 ): PushMessage {
   const offsetCm = opts.offsetCm ?? 0;
   const trend = formatTrend(opts.trend);
@@ -89,7 +90,7 @@ export function alertMessage(
           : e.to === "normal"
             ? "กลับสู่ระดับปกติ"
             : `พ้นระดับ${STATUS_LABEL[e.from]}`,
-        body: [offsetCm || e.to === "normal" ? formatGap(e.level, th) : `ยังอยู่ในระดับ${STATUS_LABEL[e.to]}`, trend, at]
+        body: [offsetCm || e.to === "normal" ? formatGap(e.level, th, opts.estimate) : `ยังอยู่ในระดับ${STATUS_LABEL[e.to]}`, trend, at]
           .filter(Boolean)
           .join(" · "),
       };
