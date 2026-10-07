@@ -1,4 +1,4 @@
-import { personalThresholds, stepAlert, wantsEvent, type AlertEvent, type AlertState, type ReadingInput, type Thresholds } from "./alerts";
+import { boundCeiling, personalThresholds, stepAlert, wantsEvent, type AlertEvent, type AlertState, type ReadingInput, type Thresholds } from "./alerts";
 import { INITIAL_TRACKING, MAX_REFS, decideTracking, type TrackingDecision } from "./autotrack";
 import { captureFrames, type Capture } from "./capture";
 import { getConfig, type SiteConfig } from "./config";
@@ -29,7 +29,7 @@ import {
   type SiteState,
   type Subscriber,
 } from "./store";
-import { summarize, type Estimate } from "./summary";
+import { isBound, summarize, type Estimate } from "./summary";
 import { applyTransform, makeReference, patchFits, toCalibratedY, track } from "./track";
 
 const HOUR = 60 * 60 * 1000;
@@ -77,27 +77,34 @@ export async function runTick(origin: string, now = Date.now(), deps: TickDeps =
       const r = decision.reading;
       notices.push(...decision.notices);
       state = { ...state, tracking: decision.state };
-      const estimate: Estimate | undefined = r.belowRange ? "below" : r.approx ? "approx" : undefined;
-      const read: LevelAt | null = r.ok && r.level !== null ? { t: cap.capturedAt, level: r.level, calibration: config.calibration } : null;
+      const estimate: Estimate | undefined = r.covered ? "covered" : r.belowRange ? "below" : r.approx ? "approx" : undefined;
+      // Plants reaching the watch line hide whether the water got there too.
+      const hidden = r.ok && r.covered && r.level !== null && r.level >= boundCeiling(config.thresholds);
+      const read: LevelAt | null =
+        r.ok && r.level !== null && !hidden ? { t: cap.capturedAt, level: r.level, calibration: config.calibration } : null;
       const held = read !== null && judgeJump(read, state.lastGood, state.held) === "hold";
-      readingInfo = { level: r.level, confidence: r.confidence, reason: held ? "jump" : r.reason, y: r.y, estimate };
+      const reason = held ? "jump" : hidden ? "covered" : r.reason;
+      readingInfo = { level: r.level, confidence: r.confidence, reason, y: r.y, estimate };
       const jpegBase64 = cap.jpeg.toString("base64");
       // A held round draws no waterline: the number on the page is still the last accepted one.
       await setSnapshot({ t: cap.capturedAt, jpegBase64, ...(read && !held ? { y: r.y, estimate } : { y: null }) });
       // Keep the picture of a round worth a second look, so the admin can see what crossed the gauge.
-      if (read && (held || r.confidence === "low")) {
-        const suspect = { t: read.t, level: read.level, y: r.y, confidence: r.confidence, reason: held ? "jump" : r.reason };
+      if (r.level !== null && (held || hidden || (read && r.confidence === "low"))) {
+        const suspect = { t: cap.capturedAt, level: r.level, y: r.y, confidence: r.confidence, reason };
         await addSuspect({ ...suspect, ...(estimate && { estimate }), lastLevel: state.lastGood?.level ?? null }, jpegBase64);
       }
 
-      if (read && held) {
+      if (hidden) {
+        state = failed(state, now, "covered", { level: r.level ?? undefined, confidence: r.confidence, y: r.y, estimate });
+      } else if (read && held) {
         state = {
           ...failed(state, now, "jump", { level: read.level, confidence: r.confidence, y: r.y, estimate }),
           held: read,
         };
       } else if (read) {
-        reading = { t: read.t, level: read.level, confidence: r.confidence };
-        await addReading({ ...reading, y: r.y ?? undefined, ...(estimate && { estimate }) });
+        const taken = { t: read.t, level: read.level, confidence: r.confidence };
+        await addReading({ ...taken, y: r.y ?? undefined, ...(estimate && { estimate }) });
+        reading = isBound(estimate) ? { ...taken, bound: true } : taken;
         const stepped = stepAlert(state.alert, reading, config.thresholds);
         events = stepped.events;
         state = {
@@ -229,7 +236,8 @@ async function notify(round: {
       current = out.state;
     }
     for (const e of mine) {
-      jobs.push({ sub, kind: "alerts", msg: alertMessage(e, thresholds, { snapshotUrl, trend: summary.trendCmPerHour, offsetCm }) });
+      const estimate = summary.latest?.t === e.t ? summary.latest.estimate : undefined;
+      jobs.push({ sub, kind: "alerts", msg: alertMessage(e, thresholds, { snapshotUrl, trend: summary.trendCmPerHour, offsetCm, estimate }) });
     }
     let reminded = false;
     if (mine.length) update(sub, { lastAlertAt: now });

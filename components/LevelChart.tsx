@@ -156,6 +156,7 @@ export function LevelChart({ day, watch, danger, now, provisional }: Props) {
   const th = { watch, danger };
   const gapAt = (p: Point) => formatGap(p[1], th, p[2]);
   const anyBelow = !!points?.some((p) => p[2] === "below");
+  const anyCovered = !!points?.some((p) => p[2] === "covered");
   const anyApprox = !!points?.some((p) => p[2] === "approx");
 
   return (
@@ -276,6 +277,7 @@ export function LevelChart({ day, watch, danger, now, provisional }: Props) {
           {geo && ` · เส้นแนวนอนห่างกัน ${Math.round(geo.step * 100)} ซม.`}
           {anyApprox && " · ช่วงที่น้ำอยู่ช่วงล่างของไม้วัดเป็นค่าประมาณ อาจคลาดเคลื่อนราว 5 ซม."}
           {anyBelow && " · ช่วงที่น้ำต่ำกว่าที่ระบบอ่านได้ เส้นแสดงที่ค่าต่ำสุดที่อ่านได้"}
+          {anyCovered && " · ช่วงที่ผักตบชวาหรือของลอยน้ำบังผิวน้ำ เส้นแสดงที่จุดเริ่มถูกบัง น้ำจริงต่ำกว่านั้น"}
           {range !== "24h" && " · แต่ละจุดคือค่าสูงสุดในช่วงนั้น"}
           {provisional && " · * เกณฑ์ชั่วคราว"}
         </p>

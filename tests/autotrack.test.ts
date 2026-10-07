@@ -3,7 +3,7 @@ import { INITIAL_TRACKING, decideTracking, type TrackingContext, type TrackingSt
 import type { GaugeReading } from "@/lib/gauge";
 import { IDENTITY, type TrackResult, type Transform } from "@/lib/track";
 
-const good: GaugeReading = { ok: true, level: 1.5, y: 300, confidence: "high", aboveTop: false, belowRange: false, approx: false, frames: [] };
+const good: GaugeReading = { ok: true, level: 1.5, y: 300, confidence: "high", aboveTop: false, belowRange: false, covered: false, approx: false, frames: [] };
 const weak: GaugeReading = { ...good, confidence: "low", reason: "weak-edge" };
 const blind: GaugeReading = { ...good, ok: false, level: null, confidence: "low", reason: "gauge-not-visible" };
 

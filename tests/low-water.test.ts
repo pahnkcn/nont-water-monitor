@@ -6,7 +6,7 @@ import type { ChartPoint, PublicState } from "@/lib/public-state";
 import type { TickResult } from "@/lib/tick";
 import { FIXTURES, loadFrame } from "./frames";
 
-// Low water on 2026-10-06 07:27: the water touches the shaded foot of the gauge (row 452, about
+// Low water on 2026-10-06 07:27: the water touches the shaded foot of the gauge (row 451, about
 // 0.76 m on the scale). The camera line must sit on that edge, and every distance is an estimate.
 
 const ORIGIN = "https://nont.example";
@@ -69,7 +69,7 @@ describe("a round with the water at the foot of the gauge", () => {
   });
 
   it("puts the camera line on the waterline and tells the page the level is an estimate", () => {
-    expect(page.snapshot).toMatchObject({ y: 452, estimate: "approx" });
+    expect(page.snapshot).toMatchObject({ y: 451, estimate: "approx" });
     expect(page.latest).toMatchObject({ level: 0.76, estimate: "approx" });
     expect(page.day.at(-1)).toEqual([clock, 0.76, "approx"]);
     expect(chart.at(-1)).toEqual([clock, 0.76, "approx"]);

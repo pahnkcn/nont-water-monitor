@@ -1,5 +1,5 @@
 import { cmBetween, formatGap, thresholdGap } from "@/lib/format";
-import type { Estimate } from "@/lib/summary";
+import { isBound, type Estimate } from "@/lib/summary";
 
 // The signature gauge, drawn like a dimension on a survey drawing: one ruler marked every
 // 10 cm, a silt column for the water, and a dimension line from the waterline to the next
@@ -62,7 +62,7 @@ export function Louvre({ level, estimate, watch, danger, provisional }: Props) {
           b: Math.max(y(target), waterY),
           railY: y(target),
           color: gap.target === "watch" ? "var(--watch)" : "var(--danger)",
-          prefix: gap.over ? "+" : gap.estimate === "below" ? ">" : gap.estimate === "approx" ? "≈" : "",
+          prefix: gap.over ? "+" : isBound(gap.estimate) ? ">" : gap.estimate === "approx" ? "≈" : "",
         }
       : null;
 

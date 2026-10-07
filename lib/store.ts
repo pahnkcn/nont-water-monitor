@@ -78,7 +78,7 @@ export async function setState(s: SiteState) {
 
 // ---------- snapshot ----------
 
-/** `y` is the waterline row, or with estimate "below" the last row scanned (the water is lower). */
+/** `y` is the waterline row; with estimate "below" the last row scanned, with "covered" the first hidden one (the water is lower). */
 export type Snapshot = { t: number; jpegBase64: string; y: number | null; estimate?: Estimate };
 
 export type SnapshotMeta = Omit<Snapshot, "jpegBase64">;
