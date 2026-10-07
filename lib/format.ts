@@ -59,12 +59,6 @@ export function formatGap(level: number, th: Pick<Thresholds, "watch" | "danger"
   return `${toGoWord(g.estimate)} ${g.cm} ซม. ถึงระดับ${STATUS_LABEL[g.target]}`;
 }
 
-/** A personal alert point: "ก่อนถึงเกณฑ์ 20 ซม." / "เกินเกณฑ์ 20 ซม." / "ตรงเกณฑ์". */
-export function formatOffset(offsetCm: number) {
-  if (offsetCm < 0) return `ก่อนถึงเกณฑ์ ${-offsetCm} ซม.`;
-  return offsetCm > 0 ? `เกินเกณฑ์ ${offsetCm} ซม.` : "ตรงเกณฑ์";
-}
-
 /** "ภาพเลื่อนขวา 18 พิกเซล ขึ้น 12 พิกเซล ซูมเข้า 8%", or null when it rounds to no move. */
 export function describeMove(from: Transform, to: Transform) {
   const parts: string[] = [];

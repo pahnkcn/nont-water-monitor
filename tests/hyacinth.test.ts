@@ -57,7 +57,6 @@ beforeAll(async () => {
       headers: { "content-type": "application/json" },
       body: JSON.stringify({
         subscription: { endpoint: "https://fcm.googleapis.com/fcm/send/MAT", keys: { p256dh: "p", auth: "a" } },
-        alerts: "watch",
         digest: { every: "off", quiet: null },
       }),
     }),

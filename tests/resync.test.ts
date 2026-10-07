@@ -10,7 +10,6 @@ import {
   INITIAL_SITE_STATE,
   addReading,
   getState,
-  getSubscriber,
   readingsSince,
   recentEvents,
   saveSubscribers,
@@ -21,8 +20,8 @@ import { summarize } from "@/lib/summary";
 import { runTick } from "@/lib/tick";
 import { FIXTURES, loadFrame } from "./frames";
 
-// An admin changes the thresholds while the site is in an alert state. The status, every
-// device's state and the texts must follow the new thresholds, without a burst of all-clears.
+// An admin changes the thresholds while the site is in an alert state. The status and the texts
+// must follow the new thresholds, without a burst of all-clears.
 
 const night = readdirSync(FIXTURES)
   .filter((f) => f.startsWith("night-") && f.endsWith(".png"))
@@ -47,33 +46,28 @@ const round = () =>
     },
   });
 
-const device = (id: string, offsetCm: number, status: "normal" | "danger"): Subscriber => ({
+const device = (id: string): Subscriber => ({
   id,
   target: { endpoint: `https://fcm.googleapis.com/fcm/send/${id}`, keys: { p256dh: "p", auth: "a" } },
   digest: { ...DEFAULT_DIGEST, every: "off" },
-  alerts: "watch",
-  offsetCm,
-  alertState: { status, since: clock - 3_600_000, lastAlertLevel: status === "normal" ? null : 1.3, pending: null },
   createdAt: clock - 86_400_000,
   lastDigestAt: clock,
 });
 
 describe("saving new thresholds", () => {
-  it("drops the site and every device out of an alert the water no longer meets, at once and quietly", async () => {
+  it("drops the site out of an alert the water no longer meets, at once and quietly", async () => {
     await saveConfig({ thresholds: LOW });
     await addReading({ t: clock, level: 1.3, confidence: "high" });
     await setState({
       ...INITIAL_SITE_STATE,
       alert: { status: "danger", since: clock - 3_600_000, lastAlertLevel: 1.3, pending: null },
     });
-    await saveSubscribers([device("SITE", 0, "danger"), device("EARLY", -20, "danger")]);
+    await saveSubscribers([device("A"), device("B")]);
 
     clock += 60_000;
     await saveConfig({ thresholds: DEFAULT_THRESHOLDS });
 
     expect((await getState()).alert.status).toBe("normal");
-    expect((await getSubscriber("SITE"))?.alertState?.status).toBe("normal");
-    expect((await getSubscriber("EARLY"))?.alertState?.status).toBe("normal");
     // The alert log strikes the old alert through instead of leaving it open.
     expect((await recentEvents(1))[0]).toEqual(expect.objectContaining({ kind: "clear", from: "danger", to: "normal" }));
     // Texts built from the new state no longer contradict the distance.
@@ -94,6 +88,6 @@ describe("saving new thresholds", () => {
     clock += 600_000;
     const r = await round();
     expect(r.events).toEqual([expect.objectContaining({ kind: "escalate", to: "danger" })]);
-    expect(sent.filter((s) => s.msg.tag === "alert").map((s) => s.to).sort()).toEqual(["EARLY", "SITE"]);
+    expect(sent.filter((s) => s.msg.tag === "alert").map((s) => s.to).sort()).toEqual(["A", "B"]);
   });
 });

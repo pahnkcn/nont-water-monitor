@@ -226,14 +226,7 @@ export function Dashboard({ initial }: { initial: PublicState }) {
                 การแจ้งเตือน
               </h2>
             </div>
-            <NotifySettings
-              push={push}
-              watch={thresholds.watch}
-              danger={thresholds.danger}
-              latestLevel={latest?.level ?? null}
-              latestEstimate={estimate}
-              provisional={state.thresholdsArePlaceholders}
-            />
+            <NotifySettings push={push} provisional={state.thresholdsArePlaceholders} />
           </section>
           <AlertLog events={state.events} />
         </div>

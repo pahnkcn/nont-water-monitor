@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEFAULT_THRESHOLDS as TH } from "@/lib/alerts";
 import { reminderMessage } from "@/lib/messages";
 import { DEFAULT_REPEAT, isReminderDue } from "@/lib/remind";
-import { sanitizeRepeat } from "@/lib/store";
+import { repeatOf, sanitizeRepeat } from "@/lib/store";
 
 // Bangkok local time helper: bkk("2026-10-04 07:05") -> UTC ms
 const bkk = (s: string) => Date.parse(s.replace(" ", "T") + ":00+07:00");
@@ -11,7 +11,6 @@ const MIN = 60_000;
 describe("isReminderDue", () => {
   const base = {
     status: "watch" as const,
-    alerts: "watch" as const,
     repeat: DEFAULT_REPEAT,
     quiet: null,
     lastAlertAt: bkk("2026-10-05 07:20"),
@@ -31,13 +30,6 @@ describe("isReminderDue", () => {
 
   it("never repeats at the normal level", () => {
     expect(isReminderDue({ ...base, status: "normal", now: bkk("2026-10-05 12:00") })).toBe(false);
-  });
-
-  it("follows the level the device asked to be alerted from", () => {
-    const later = bkk("2026-10-05 09:00");
-    expect(isReminderDue({ ...base, alerts: "danger", now: later })).toBe(false);
-    expect(isReminderDue({ ...base, alerts: "danger", status: "danger", now: later })).toBe(true);
-    expect(isReminderDue({ ...base, alerts: "off", status: "danger", now: later })).toBe(false);
   });
 
   it("uses the chosen interval, and 0 turns a level off", () => {
@@ -69,6 +61,20 @@ describe("sanitizeRepeat", () => {
   });
 });
 
+describe("repeatOf", () => {
+  it("gives the defaults to a device that never chose", () => {
+    expect(repeatOf({})).toEqual(DEFAULT_REPEAT);
+    expect(repeatOf({ repeat: { watch: 120, danger: 0 } })).toEqual({ watch: 120, danger: 0 });
+  });
+
+  it("keeps a device saved with alerts from danger only, or off, away from the reminders it had turned away", () => {
+    expect(repeatOf({ alerts: "danger" })).toEqual({ watch: 0, danger: DEFAULT_REPEAT.danger });
+    expect(repeatOf({ alerts: "danger", repeat: { watch: 60, danger: 30 } })).toEqual({ watch: 0, danger: 30 });
+    expect(repeatOf({ alerts: "off", repeat: DEFAULT_REPEAT })).toEqual({ watch: 0, danger: 0 });
+    expect(repeatOf({ alerts: "watch", repeat: { watch: 60, danger: 30 } })).toEqual({ watch: 60, danger: 30 });
+  });
+});
+
 describe("reminderMessage", () => {
   // Site thresholds: watch 2.20, danger 2.50.
   const at = bkk("2026-10-05 08:40");
@@ -91,14 +97,13 @@ describe("reminderMessage", () => {
     expect(m.requireInteraction).toBe(false);
   });
 
-  it("with an early alert point, says how far the site threshold still is", () => {
-    const m = reminderMessage("watch", reading(2.12), TH, { ...fresh, everyMin: 30, offsetCm: -20 });
-    expect(m.title).toBe("ยังใกล้ระดับเฝ้าระวัง: น้ำท่าน้ำนนท์อีก 8 ซม.");
-    expect(m.body).toContain("จุดเตือนของคุณ: ก่อนถึงเกณฑ์ 20 ซม.");
+  it("held at watch just under the line, says how far the line is", () => {
+    const m = reminderMessage("watch", reading(2.17), TH, { ...fresh, everyMin: 30 });
+    expect(m.title).toBe("ยังใกล้ระดับเฝ้าระวัง: น้ำท่าน้ำนนท์อีก 3 ซม.");
   });
 
-  it("never says watch while the water is over danger (unconfirmed rise, or a late alert point)", () => {
-    const m = reminderMessage("watch", reading(2.53), TH, { ...fresh, everyMin: 30, offsetCm: 30 });
+  it("never says watch while the water is over danger (a rise not yet confirmed)", () => {
+    const m = reminderMessage("watch", reading(2.53), TH, { ...fresh, everyMin: 30 });
     expect(m.title).toBe("น้ำท่าน้ำนนท์สูงกว่าระดับอันตราย 3 ซม.");
     expect(m.body).not.toContain("สูงกว่าระดับอันตราย");
   });

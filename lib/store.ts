@@ -1,6 +1,6 @@
 import { createHash } from "node:crypto";
-import type { AlertEvent, AlertPreference, AlertState, Thresholds } from "./alerts";
-import { INITIAL_ALERT_STATE, OFFSET_CHOICES, initialPersonalState, personalThresholds, rank } from "./alerts";
+import type { AlertEvent, AlertState, Thresholds } from "./alerts";
+import { INITIAL_ALERT_STATE, rank, stateAtLevel } from "./alerts";
 import { INITIAL_TRACKING, type TrackingState } from "./autotrack";
 import { KEYS, kv } from "./kv";
 import type { PushTarget } from "./push";
@@ -171,18 +171,18 @@ export type Subscriber = {
   id: string;
   target: PushTarget;
   digest: DigestPref;
-  alerts: AlertPreference;
   createdAt: number;
   lastDigestAt: number;
   lastTestAt?: number;
-  /** Personal alert point in cm against the site thresholds; see OFFSET_CHOICES. */
-  offsetCm?: number;
-  /** Alert state at the personal point. Missing on devices subscribed before personal points existed. */
-  alertState?: AlertState;
   /** Gets camera and tracking notices meant for whoever runs the site. */
   admin?: boolean;
-  /** Reminders while the water stays over this device's alert point. Missing means DEFAULT_REPEAT. */
+  /** Reminders while the water stays at watch or danger. Read through repeatOf. */
   repeat?: RepeatPref;
+  /**
+   * The level alerts started from, on devices saved back when that was a choice. Every device is
+   * alerted now; repeatOf keeps them from reminders at a level they had turned away.
+   */
+  alerts?: "watch" | "danger" | "off";
   /** When this device was last sent an alert or a reminder. */
   lastAlertAt?: number;
 };
@@ -219,18 +219,17 @@ export function sanitizeDigest(d: Partial<DigestPref> | undefined, fallback: Dig
   return { every, dailyHour: hour(d?.dailyHour, fallback.dailyHour), quiet };
 }
 
-export function sanitizeAlerts(a: unknown, fallback: AlertPreference = "danger"): AlertPreference {
-  return a === "watch" || a === "danger" || a === "off" ? a : fallback;
-}
-
-export function sanitizeOffset(v: unknown, fallback = 0): number {
-  return (OFFSET_CHOICES as readonly unknown[]).includes(v) ? (v as number) : fallback;
-}
-
 export function sanitizeRepeat(r: Partial<RepeatPref> | undefined, fallback: RepeatPref = DEFAULT_REPEAT): RepeatPref {
   const pick = (level: keyof RepeatPref) =>
     (REPEAT_CHOICES[level] as readonly unknown[]).includes(r?.[level]) ? (r![level] as number) : fallback[level];
   return { watch: pick("watch"), danger: pick("danger") };
+}
+
+/** The reminders a device gets. Missing means DEFAULT_REPEAT, less any level it had turned alerts off for. */
+export function repeatOf(sub: Pick<Subscriber, "repeat" | "alerts">): RepeatPref {
+  const repeat = sub.repeat ?? DEFAULT_REPEAT;
+  if (sub.alerts === "off") return { watch: 0, danger: 0 };
+  return sub.alerts === "danger" ? { ...repeat, watch: 0 } : repeat;
 }
 
 export async function getSubscriber(id: string) {
@@ -249,13 +248,12 @@ export async function saveSubscribers(subs: Subscriber[]) {
   await kv().hset(KEYS.subs, Object.fromEntries(subs.map((s) => [s.id, s])));
 }
 
-/** What a round changes on a device: its state at its own alert point, and when its last update and alert went out. */
-export type RoundUpdate = { id: string; offsetCm: number; alertState?: AlertState; lastDigestAt?: number; lastAlertAt?: number };
+/** What a round changes on a device: when its last update and alert went out. */
+export type RoundUpdate = { id: string; lastDigestAt?: number; lastAlertAt?: number };
 
 /**
  * Apply a round's results to the records as they are now, not as they were when the round began.
- * A device unsubscribed meanwhile stays gone, and a newly picked alert point keeps the starting
- * state the subscribe route gave it.
+ * A device unsubscribed meanwhile stays gone, and settings changed meanwhile are kept.
  */
 export async function applyRoundUpdates(updates: RoundUpdate[]) {
   if (!updates.length) return;
@@ -267,40 +265,25 @@ export async function applyRoundUpdates(updates: RoundUpdate[]) {
     const next = { ...sub };
     if (u.lastDigestAt !== undefined) next.lastDigestAt = Math.max(sub.lastDigestAt, u.lastDigestAt);
     if (u.lastAlertAt !== undefined) next.lastAlertAt = Math.max(sub.lastAlertAt ?? 0, u.lastAlertAt);
-    if (u.alertState && (sub.offsetCm ?? 0) === u.offsetCm) next.alertState = u.alertState;
     merged.push(next);
   }
   if (merged.length) await saveSubscribers(merged);
 }
 
 /**
- * After new thresholds are saved: lower the site's and every device's alert state to what the
- * latest reading meets under them, without notifications, so the header, the page and every text
- * agree at once. A state that would rise is left to the next round, which alerts as usual.
+ * After new thresholds are saved: lower the site's alert state to what the latest reading meets
+ * under them, without notifications, so the header, the page and every text agree at once. A
+ * state that would rise is left to the next round, which alerts as usual.
  */
 export async function resyncAlerts(th: Thresholds, now: number) {
   const latest = await latestReading();
   if (!latest) return;
-  const lowered = (current: AlertState, t: Thresholds) => {
-    const fresh = initialPersonalState(latest.level, t, now);
-    return rank(fresh.status) < rank(current.status) ? fresh : null;
-  };
-
   const state = await getState();
-  const site = lowered(state.alert, th);
-  if (site) {
-    await setState({ ...state, alert: site });
-    // Strikes the old alert through in the public log.
-    await logEvents([{ kind: "clear", from: state.alert.status, to: site.status, level: latest.level, t: now }]);
-  }
-
-  const updates: RoundUpdate[] = [];
-  for (const sub of await allSubscribers()) {
-    const offsetCm = sub.offsetCm ?? 0;
-    const mine = lowered(sub.alertState ?? state.alert, personalThresholds(th, offsetCm));
-    if (mine) updates.push({ id: sub.id, offsetCm, alertState: mine });
-  }
-  await applyRoundUpdates(updates);
+  const fresh = stateAtLevel(latest.level, th, now);
+  if (rank(fresh.status) >= rank(state.alert.status)) return;
+  await setState({ ...state, alert: fresh });
+  // Strikes the old alert through in the public log.
+  await logEvents([{ kind: "clear", from: state.alert.status, to: fresh.status, level: latest.level, t: now }]);
 }
 
 export async function removeSubscribers(ids: string[]) {

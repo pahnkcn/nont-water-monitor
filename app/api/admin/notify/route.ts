@@ -23,15 +23,13 @@ export async function POST(req: Request) {
     }
   }
   // A new device gets the same defaults as the one-tap button on the dashboard, so the dashboard
-  // shows honest settings for it. No alert state yet: it follows the site's until its first round.
+  // shows honest settings for it.
   const sub: Subscriber = existing
     ? { ...existing, admin: body.on }
     : {
         id,
         target: { endpoint: target.endpoint, keys: { p256dh: target.keys.p256dh, auth: target.keys.auth } },
         digest: DEFAULT_DIGEST,
-        alerts: "danger",
-        offsetCm: 0,
         createdAt: now,
         lastDigestAt: now,
         admin: body.on,

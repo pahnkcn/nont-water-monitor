@@ -1,6 +1,5 @@
 import { readJson } from "@/lib/auth";
-import { DEFAULT_REPEAT } from "@/lib/remind";
-import { getSubscriber, subscriberId } from "@/lib/store";
+import { getSubscriber, repeatOf, subscriberId } from "@/lib/store";
 
 export async function POST(req: Request) {
   const body = await readJson<{ endpoint?: string }>(req);
@@ -11,9 +10,7 @@ export async function POST(req: Request) {
     {
       subscribed: true,
       digest: sub.digest,
-      alerts: sub.alerts,
-      offsetCm: sub.offsetCm ?? 0,
-      repeat: sub.repeat ?? DEFAULT_REPEAT,
+      repeat: repeatOf(sub),
       admin: Boolean(sub.admin),
     },
     { headers: { "cache-control": "no-store" } },

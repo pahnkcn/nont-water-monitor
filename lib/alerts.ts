@@ -19,37 +19,11 @@ export const DEFAULT_THRESHOLDS: Thresholds = {
 };
 
 /**
- * Personal alert points, in cm against the site thresholds. Negative alerts before the water
- * gets there (a low house), positive only once it is that far over (a raised one).
- */
-export const OFFSET_CHOICES = [-50, -30, -20, -10, 0, 10, 20, 30] as const;
-
-/**
- * The highest a bound (the water hidden somewhere under it) is worth keeping at: under the site's
- * watch level and every device's danger point, where "more than … cm to go" is still true.
+ * The highest a bound (the water hidden somewhere under it) is worth keeping at: under the
+ * watch level, where "more than … cm to go" is still true.
  */
 export function boundCeiling(th: Pick<Thresholds, "watch" | "danger">) {
-  return Math.min(th.watch, th.danger + Math.min(...OFFSET_CHOICES) / 100);
-}
-
-/** Both thresholds moved by the subscriber's offset. */
-export function personalThresholds(th: Thresholds, offsetCm: number): Thresholds {
-  const move = (v: number) => Math.round(v * 100 + offsetCm) / 100;
-  return { ...th, watch: move(th.watch), danger: move(th.danger) };
-}
-
-/**
- * Whether the water is still below the first point `pref` alerts at for someone at `offsetCm`.
- * A point the water is already at or over sends no first alert: picking it starts the device there.
- */
-export function pointAhead(
-  level: number | null,
-  th: Pick<Thresholds, "watch" | "danger">,
-  pref: AlertPreference,
-  offsetCm: number,
-): boolean {
-  if (pref === "off" || level === null) return true;
-  return Math.round(th[pref] * 100) + offsetCm > Math.round(level * 100);
+  return Math.min(th.watch, th.danger);
 }
 
 export type AlertState = {
@@ -96,8 +70,8 @@ export function classify(level: number, th: Thresholds, current: Status): Status
   return "normal";
 }
 
-/** State for someone who has just picked an alert point: where the water already is, without an alert. */
-export function initialPersonalState(level: number | null, th: Thresholds, now: number): AlertState {
+/** The state a level puts the site in when it is taken there without an alert. */
+export function stateAtLevel(level: number | null, th: Thresholds, now: number): AlertState {
   const status = level === null ? "normal" : classify(level, th, "normal");
   return { status, since: now, lastAlertLevel: status === "normal" ? null : level, pending: null };
 }
@@ -157,21 +131,4 @@ export function stepAlert(
     },
     events: [event],
   };
-}
-
-export type AlertPreference = "watch" | "danger" | "off";
-
-/** Whether a subscriber who asked for alerts from `pref` upward should hear about this event. */
-export function wantsEvent(pref: AlertPreference, event: AlertEvent): boolean {
-  if (pref === "off") return false;
-  const min = rank(pref);
-  switch (event.kind) {
-    case "escalate":
-      return rank(event.to) >= min;
-    case "rising":
-      return rank("danger") >= min;
-    case "clear":
-      // Only people who were told about the level being left.
-      return rank(event.from) >= min;
-  }
 }
