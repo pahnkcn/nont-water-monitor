@@ -1,5 +1,6 @@
 import { createHash } from "node:crypto";
 import type { AlertEvent, AlertState, Thresholds } from "./alerts";
+import type { GaugeConfig } from "./gauge-config";
 import { INITIAL_ALERT_STATE, rank, stateAtLevel } from "./alerts";
 import { INITIAL_TRACKING, type TrackingState } from "./autotrack";
 import { KEYS, kv } from "./kv";
@@ -78,10 +79,13 @@ export async function setState(s: SiteState) {
 
 // ---------- snapshot ----------
 
-/** `y` is the waterline row; with estimate "below" the last row scanned, with "covered" the first hidden one (the water is lower). */
-export type Snapshot = { t: number; jpegBase64: string; y: number | null; estimate?: Estimate };
+/**
+ * `y` is the waterline row; with estimate "below" the last row scanned, with "covered" the first
+ * hidden one (the water is lower). `gauge` is the calibration it was read at, for a label on it.
+ */
+export type Snapshot = { t: number; jpegBase64: string; y: number | null; estimate?: Estimate; gauge?: GaugeConfig };
 
-export type SnapshotMeta = Omit<Snapshot, "jpegBase64">;
+export type SnapshotMeta = Omit<Snapshot, "jpegBase64" | "gauge">;
 
 export async function setSnapshot(s: Snapshot) {
   await kv().set(KEYS.snapshot, s);
@@ -134,6 +138,8 @@ export type Suspect = {
   estimate?: Estimate;
   /** The accepted level the round was judged against. */
   lastLevel: number | null;
+  /** The calibration the round was read at; missing on rounds kept before labels. */
+  gauge?: GaugeConfig;
 };
 
 /** The pictures go in a second list kept in step with the first, so listing the rounds stays small. */

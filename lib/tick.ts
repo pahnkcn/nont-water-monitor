@@ -31,7 +31,7 @@ import {
   type Subscriber,
 } from "./store";
 import { isBound, summarize, type Estimate } from "./summary";
-import { applyTransform, makeReference, patchFits, toCalibratedY, track } from "./track";
+import { applyTransform, makeReference, patchFits, toCalibratedY, track, type Transform } from "./track";
 
 const HOUR = 60 * 60 * 1000;
 /** After this long without a good read, routine updates say the camera is down. */
@@ -87,11 +87,12 @@ export async function runTick(origin: string, now = Date.now(), deps: TickDeps =
       const reason = held ? "jump" : hidden ? "covered" : r.reason;
       readingInfo = { level: r.level, confidence: r.confidence, reason, y: r.y, estimate };
       const jpegBase64 = cap.jpeg.toString("base64");
+      const { gauge } = decision;
       // A held round draws no waterline: the number on the page is still the last accepted one.
-      await setSnapshot({ t: cap.capturedAt, jpegBase64, ...(read && !held ? { y: r.y, estimate } : { y: null }) });
+      await setSnapshot({ t: cap.capturedAt, jpegBase64, gauge, ...(read && !held ? { y: r.y, estimate } : { y: null }) });
       // Keep the picture of a round worth a second look, so the admin can see what crossed the gauge.
       if (r.level !== null && (held || hidden || (read && r.confidence === "low"))) {
-        const suspect = { t: cap.capturedAt, level: r.level, y: r.y, confidence: r.confidence, reason };
+        const suspect = { t: cap.capturedAt, level: r.level, y: r.y, confidence: r.confidence, reason, gauge };
         await addSuspect({ ...suspect, ...(estimate && { estimate }), lastLevel: state.lastGood?.level ?? null }, jpegBase64);
       }
 
@@ -162,7 +163,10 @@ export async function runTick(origin: string, now = Date.now(), deps: TickDeps =
   }
 }
 
-/** Find the gauge in this capture (following a moved camera), then read it there. */
+/**
+ * Find the gauge in this capture (following a moved camera), then read it there. `gauge` is the
+ * calibration as it was read, kept with the picture so a label on it can be read the same way.
+ */
 async function readTracked(cap: Capture, config: SiteConfig, state: SiteState, now: number) {
   const refs = config.autoTrack ? await getGaugeRefs() : [];
   const frame = cap.frames[Math.floor(cap.frames.length / 2)];
@@ -174,15 +178,17 @@ async function readTracked(cap: Capture, config: SiteConfig, state: SiteState, n
   const result = config.autoTrack && refs.length && !dark ? track(frame, refs, { maskBelowY, at: prev.transform }) : null;
   const lumaNow = () => makeReference(frame, config.gauge, prev.transform).meanLuma;
 
-  const decision = decideTracking(prev, result, { auto: config.autoTrack, refs, lumaNow, now }, (t) =>
-    readGauge(cap.frames, applyTransform(config.gauge, t)),
-  );
+  let readAt: Transform = prev.transform;
+  const decision = decideTracking(prev, result, { auto: config.autoTrack, refs, lumaNow, now }, (t) => {
+    readAt = t; // once a round, whichever way the tracker decides
+    return readGauge(cap.frames, applyTransform(config.gauge, t), config.reader.params);
+  });
   // A patch cut off by the frame edge would be stored with a black band; wait for a better round.
   if (decision.learn && patchFits(config.gauge, decision.learn)) {
     const learned = makeReference(frame, config.gauge, decision.learn, cap.capturedAt);
     await setGaugeRefs([...refs, learned].slice(-MAX_REFS));
   }
-  return decision;
+  return { ...decision, gauge: applyTransform(config.gauge, readAt) };
 }
 
 /** `read` keeps what the reader saw when the level was refused rather than unreadable. */

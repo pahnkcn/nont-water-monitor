@@ -1,6 +1,7 @@
 import { DEFAULT_THRESHOLDS, type Thresholds } from "./alerts";
 import { DEFAULT_GAUGE_CONFIG, type GaugeConfig } from "./gauge-config";
 import { KEYS, kv } from "./kv";
+import { DEFAULT_READER_PARAMS, type ReaderParams } from "./reader-params";
 import { resetTracking, resyncAlerts } from "./store";
 
 export type SiteConfig = {
@@ -12,8 +13,15 @@ export type SiteConfig = {
   thresholdsArePlaceholders: boolean;
   /** Goes up by one each time a calibration is saved; a round that sees it change drops its tracking. */
   calibration: number;
+  /** The numbers the gauge reader judges by; tuned in /admin on labelled rounds (lib/tune.ts). */
+  reader: ReaderSettings;
   updatedAt: number | null;
 };
+
+/** `savedAt` is null while the shipped numbers are in use; `labels` is how many rounds they were tuned on. */
+export type ReaderSettings = { params: ReaderParams; savedAt: number | null; labels: number };
+
+const DEFAULT_READER: ReaderSettings = { params: DEFAULT_READER_PARAMS, savedAt: null, labels: 0 };
 
 type StoredConfig = Partial<Omit<SiteConfig, "thresholdsArePlaceholders">> & {
   thresholdsConfirmed?: boolean;
@@ -27,6 +35,8 @@ export async function getConfig(): Promise<SiteConfig> {
     autoTrack: stored.autoTrack ?? true,
     thresholdsArePlaceholders: !stored.thresholdsConfirmed,
     calibration: stored.calibration ?? 0,
+    // A number added to the reader later starts from its shipped value.
+    reader: stored.reader ? { ...stored.reader, params: { ...DEFAULT_READER_PARAMS, ...stored.reader.params } } : DEFAULT_READER,
     updatedAt: stored.updatedAt ?? null,
   };
 }
@@ -53,9 +63,17 @@ export function validateGauge(g: GaugeConfig): string | null {
   return null;
 }
 
-export async function saveConfig(patch: { thresholds?: Thresholds; gauge?: GaugeConfig; autoTrack?: boolean }) {
+export async function saveConfig(patch: {
+  thresholds?: Thresholds;
+  gauge?: GaugeConfig;
+  autoTrack?: boolean;
+  /** Tuned reader numbers, with how many labelled rounds they were tuned on. */
+  reader?: { params: ReaderParams; labels: number };
+  resetReader?: boolean;
+}) {
   const stored = (await kv().get<StoredConfig>(KEYS.config)) ?? {};
-  const next: StoredConfig = { ...stored, updatedAt: Date.now() };
+  const now = Date.now();
+  const next: StoredConfig = { ...stored, updatedAt: now };
   if (patch.thresholds) {
     next.thresholds = patch.thresholds;
     next.thresholdsConfirmed = true;
@@ -65,6 +83,8 @@ export async function saveConfig(patch: { thresholds?: Thresholds; gauge?: Gauge
     next.calibration = (stored.calibration ?? 0) + 1;
   }
   if (typeof patch.autoTrack === "boolean") next.autoTrack = patch.autoTrack;
+  if (patch.reader) next.reader = { params: patch.reader.params, labels: patch.reader.labels, savedAt: now };
+  if (patch.resetReader) delete next.reader;
   await kv().set(KEYS.config, next);
   // A calibration saved by hand is drawn on the camera as it is now: start tracking from it afresh.
   if (patch.gauge) await resetTracking();

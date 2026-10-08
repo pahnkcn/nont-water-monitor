@@ -9,7 +9,9 @@ import type { GaugeConfig } from "@/lib/gauge-config";
 import { MAX_SUSPECTS } from "@/lib/jump";
 import type { SiteState, SnapshotMeta, Suspect } from "@/lib/store";
 import type { PushProblem } from "@/lib/push";
+import type { ReaderParams } from "@/lib/reader-params";
 import { IDENTITY, applyTransform } from "@/lib/track";
+import { Labeller, ReaderTuning, type LabelMeta } from "./AdminLabels";
 import { pushSubscription } from "./usePush";
 
 type AdminData = {
@@ -20,6 +22,7 @@ type AdminData = {
   refs: { t: number; meanLuma: number }[];
   push: { subject: string | null; problems: PushProblem[] };
   suspects: Suspect[];
+  labels: LabelMeta[];
 };
 
 const PUSH_PROBLEM: Record<PushProblem, string> = {
@@ -30,7 +33,7 @@ const PUSH_PROBLEM: Record<PushProblem, string> = {
   "subject-localhost": "VAPID_SUBJECT เป็น localhost ซึ่ง iPhone ไม่รับ",
 };
 /** `near` puts the status line next to the section the action came from. */
-type Msg = { text: string; tone: "ok" | "bad"; near?: "track" } | null;
+type Msg = { text: string; tone: "ok" | "bad"; near?: "track" | "reader" } | null;
 
 const KEY = "nont-admin";
 
@@ -57,6 +60,7 @@ export function AdminPanel() {
   const [msg, setMsg] = useState<Msg>(null);
   const [busy, setBusy] = useState(false);
   const [pointerY, setPointerY] = useState<number | null>(null);
+  const [labels, setLabels] = useState<LabelMeta[]>([]);
 
   const load = useCallback(async (pw: string) => {
     setBusy(true);
@@ -67,6 +71,7 @@ export function AdminPanel() {
       if (!res.ok) throw new Error(`โหลดไม่สำเร็จ (${res.status})`);
       const d = (await res.json()) as AdminData;
       setData(d);
+      setLabels(d.labels);
       setThresholds(d.config.thresholds);
       setGauge(liveGauge(d));
       try {
@@ -95,10 +100,17 @@ export function AdminPanel() {
   }, [load]);
 
   const save = async (
-    body: { thresholds?: Thresholds; gauge?: GaugeConfig; autoTrack?: boolean; resetRefs?: boolean },
+    body: {
+      thresholds?: Thresholds;
+      gauge?: GaugeConfig;
+      autoTrack?: boolean;
+      resetRefs?: boolean;
+      reader?: { params: ReaderParams; labels: number };
+      resetReader?: true;
+    },
     done = "บันทึกแล้ว มีผลตั้งแต่รอบอ่านค่าถัดไป",
-    near?: "track",
-  ) => {
+    near?: "track" | "reader",
+  ): Promise<boolean> => {
     setBusy(true);
     setMsg(null);
     try {
@@ -112,8 +124,10 @@ export function AdminPanel() {
       // load() clears the status line, so report after it.
       await load(password);
       setMsg({ text: done, tone: "ok", near });
+      return true;
     } catch (e) {
       setMsg({ text: (e as Error).message, tone: "bad", near });
+      return false;
     } finally {
       setBusy(false);
     }
@@ -153,6 +167,9 @@ export function AdminPanel() {
     load(password);
   };
 
+  /** A label just saved replaces any earlier one for the same round. */
+  const labelSaved = (l: LabelMeta) => setLabels((ls) => [l, ...ls.filter((x) => x.t !== l.t)].sort((a, b) => b.t - a.t));
+
   const onImageMove = (e: MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     setPointerY(Math.round(((e.clientY - rect.top) / rect.height) * 600));
@@ -185,7 +202,7 @@ export function AdminPanel() {
     );
   }
 
-  const { state } = data;
+  const { state, snapshot: snap } = data;
   const numInput = (label: string, key: keyof Thresholds, step = 0.01) => (
     <label className="inline-select" key={key}>
       <span style={{ minWidth: 180 }}>{label}</span>
@@ -239,7 +256,16 @@ export function AdminPanel() {
         </p>
       </section>
 
-      <SuspectRounds suspects={data.suspects} password={password} />
+      <SuspectRounds suspects={data.suspects} labels={labels} password={password} onLabelSaved={labelSaved} />
+
+      <ReaderTuning
+        reader={data.config.reader}
+        labels={labels}
+        password={password}
+        status={msg?.near === "reader" ? msg : null}
+        onDeleted={(t) => setLabels((ls) => ls.filter((l) => l.t !== t))}
+        onApplied={(body, done) => save(body, done, "reader")}
+      />
 
       <section className="section">
         <div className="section__head">
@@ -332,36 +358,54 @@ export function AdminPanel() {
           <h2 className="section__title">ตำแหน่งไม้วัดในภาพ</h2>
           <p className="section__sub num">ตำแหน่งเมาส์: แถว {pointerY ?? "-"}</p>
         </div>
-        <div className="camera" onMouseMove={onImageMove} onMouseLeave={() => setPointerY(null)} style={{ maxWidth: 800 }}>
-          {data.snapshot ? (
-            <>
-              {/* eslint-disable-next-line @next/next/no-img-element -- admin preview of our own snapshot */}
-              <img src={`/api/snapshot?t=${data.snapshot.t}`} alt="ภาพล่าสุดที่ระบบอ่าน" width={800} height={600} />
-              {gauge.marks.map((m) => (
-                <div
-                  key={m.y}
-                  className="camera__line"
-                  style={{ top: `${(m.y / 600) * 100}%`, borderTop: "1px solid rgb(0 255 200 / 0.8)" }}
-                >
-                  <span className="num" style={{ fontSize: 11, padding: "0 4px" }}>{m.level.toFixed(2)}</span>
-                </div>
-              ))}
-              {data.snapshot.y !== null && (
-                <div className="camera__line" style={{ top: `${(data.snapshot.y / 600) * 100}%` }}>
-                  <span>
-                    {data.snapshot.estimate === "below"
-                      ? `ไม่พบน้ำถึงแถวสุดท้ายที่อ่าน (${data.snapshot.y})`
-                      : data.snapshot.estimate === "covered"
-                        ? `ไม้วัดถูกบังตั้งแต่แถว ${data.snapshot.y} น้ำอยู่ต่ำกว่านั้น`
-                      : `ผิวน้ำที่ตรวจพบ แถว ${data.snapshot.y}${data.snapshot.estimate === "approx" ? " (ช่วงล่าง ค่าประมาณ)" : ""}`}
-                  </span>
-                </div>
-              )}
-            </>
-          ) : (
+        {snap ? (
+          <Labeller
+            key={snap.t}
+            target={{ source: "snapshot", t: snap.t }}
+            readerY={snap.y}
+            label={labels.find((l) => l.t === snap.t)}
+            password={password}
+            onSaved={labelSaved}
+          >
+            {(overlay, onPick) => (
+              <div
+                className="camera"
+                onMouseMove={onImageMove}
+                onMouseLeave={() => setPointerY(null)}
+                onClick={onPick}
+                style={{ maxWidth: 800, cursor: onPick ? "crosshair" : undefined }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element -- admin preview of our own snapshot */}
+                <img src={`/api/snapshot?t=${snap.t}`} alt="ภาพล่าสุดที่ระบบอ่าน" width={800} height={600} />
+                {gauge.marks.map((m) => (
+                  <div
+                    key={m.y}
+                    className="camera__line"
+                    style={{ top: `${(m.y / 600) * 100}%`, borderTop: "1px solid rgb(0 255 200 / 0.8)" }}
+                  >
+                    <span className="num" style={{ fontSize: 11, padding: "0 4px" }}>{m.level.toFixed(2)}</span>
+                  </div>
+                ))}
+                {snap.y !== null && (
+                  <div className="camera__line" style={{ top: `${(snap.y / 600) * 100}%` }}>
+                    <span>
+                      {snap.estimate === "below"
+                        ? `ไม่พบน้ำถึงแถวสุดท้ายที่อ่าน (${snap.y})`
+                        : snap.estimate === "covered"
+                          ? `ไม้วัดถูกบังตั้งแต่แถว ${snap.y} น้ำอยู่ต่ำกว่านั้น`
+                        : `ผิวน้ำที่ตรวจพบ แถว ${snap.y}${snap.estimate === "approx" ? " (ช่วงล่าง ค่าประมาณ)" : ""}`}
+                    </span>
+                  </div>
+                )}
+                {overlay}
+              </div>
+            )}
+          </Labeller>
+        ) : (
+          <div className="camera" style={{ maxWidth: 800 }}>
             <div className="camera__empty">ยังไม่มีภาพ กดอ่านค่าตอนนี้</div>
-          )}
-        </div>
+          </div>
+        )}
         <p className="facts quiet" style={{ marginTop: 12 }}>
           เส้นสีฟ้าคือขีดอ้างอิงแต่ละ 10 ซม. วาดตามตำแหน่งที่ระบบตามกล้องได้ล่าสุด ถ้าเลขหลักเมตรผิดทั้งไม้ ใช้ปุ่มเลื่อนสเกล
           ถ้าเส้นไม่ตรงขีดในภาพ แก้ค่าแถวด้านล่าง เมื่อบันทึก ระบบจะเริ่มตามกล้องใหม่จากเส้นชุดนี้
@@ -438,7 +482,17 @@ const metres = (s: { level: number; estimate?: Suspect["estimate"] }) =>
   `${s.estimate === "below" || s.estimate === "covered" ? "ต่ำกว่า " : s.estimate === "approx" ? "ประมาณ " : ""}${s.level.toFixed(2)} ม.`;
 
 /** Rounds held back as jumps or read with low confidence, each with the picture the reader saw. */
-function SuspectRounds({ suspects, password }: { suspects: Suspect[]; password: string }) {
+function SuspectRounds({
+  suspects,
+  labels,
+  password,
+  onLabelSaved,
+}: {
+  suspects: Suspect[];
+  labels: LabelMeta[];
+  password: string;
+  onLabelSaved: (l: LabelMeta) => void;
+}) {
   const [open, setOpen] = useState<{ t: number; url: string | null; error: string | null } | null>(null);
 
   // Revoke each picture's object URL once another replaces it or the list closes.
@@ -473,47 +527,62 @@ function SuspectRounds({ suspects, password }: { suspects: Suspect[]; password: 
       </div>
       <p className="facts quiet" style={{ marginBottom: 4 }}>
         รอบที่ค่าต่างจากรอบก่อนเกินกว่าน้ำจะขึ้นลงได้ (ระบบพักค่าไว้ ไม่บันทึกและไม่เตือน จนกว่ารอบถัดไปจะยืนยัน)
-        หรือรอบที่อ่านได้ไม่มั่นใจ ดูภาพเพื่อหาว่าอะไรบังไม้วัด
+        หรือรอบที่อ่านได้ไม่มั่นใจ ดูภาพเพื่อหาว่าอะไรบังไม้วัด แล้วบอกระบบว่าอ่านถูกหรือผิด
       </p>
       {suspects.length === 0 ? (
         <p className="facts quiet">ยังไม่มีรอบที่น่าสงสัย</p>
       ) : (
         <ul className="log suspects">
-          {suspects.map((s, i) => (
-            <li key={s.t}>
-              <span className="what num">
-                {s.reason === "jump"
-                  ? `พักไว้ · อ่านได้ ${metres(s)}${s.lastLevel !== null ? ` จากค่าก่อนหน้า ${s.lastLevel.toFixed(2)} ม.` : ""}`
-                  : `ไม่มั่นใจ · อ่านได้ ${metres(s)}${s.reason ? ` · ${REASON_LABEL[s.reason] ?? s.reason}` : ""}`}
-              </span>
-              <span className="when num">
-                {formatDateTime(s.t)}
-                {s.y !== null && ` · แถว ${s.y}`}
-              </span>
-              <button type="button" className="btn btn--quiet" aria-expanded={open?.t === s.t} onClick={() => show(s, i)}>
-                {open?.t === s.t ? "ซ่อนภาพ" : "ดูภาพ"}
-              </button>
-              {open?.t === s.t && (
-                <div className="camera" style={{ maxWidth: 800 }}>
-                  {open.url ? (
-                    <>
-                      {/* eslint-disable-next-line @next/next/no-img-element -- object URL of an admin-only picture */}
-                      <img src={open.url} alt={`ภาพรอบ ${formatDateTime(s.t)}`} width={800} height={600} />
-                      {s.y !== null && (
-                        <div className="camera__line" style={{ top: `${(s.y / 600) * 100}%` }}>
-                          <span>ระบบเห็นผิวน้ำที่แถว {s.y}</span>
+          {suspects.map((s, i) => {
+            const label = labels.find((l) => l.t === s.t);
+            const url = open?.t === s.t ? open.url : null;
+            return (
+              <li key={s.t}>
+                <span className="what num">
+                  {s.reason === "jump"
+                    ? `พักไว้ · อ่านได้ ${metres(s)}${s.lastLevel !== null ? ` จากค่าก่อนหน้า ${s.lastLevel.toFixed(2)} ม.` : ""}`
+                    : `ไม่มั่นใจ · อ่านได้ ${metres(s)}${s.reason ? ` · ${REASON_LABEL[s.reason] ?? s.reason}` : ""}`}
+                </span>
+                <span className="when num">
+                  {formatDateTime(s.t)}
+                  {s.y !== null && ` · แถว ${s.y}`}
+                  {label && " · label แล้ว"}
+                </span>
+                <button type="button" className="btn btn--quiet" aria-expanded={open?.t === s.t} onClick={() => show(s, i)}>
+                  {open?.t === s.t ? "ซ่อนภาพ" : "ดูภาพ"}
+                </button>
+                {open?.t === s.t &&
+                  (url ? (
+                    <Labeller
+                      target={{ source: "suspect", i, t: s.t }}
+                      readerY={s.y}
+                      label={label}
+                      password={password}
+                      onSaved={onLabelSaved}
+                    >
+                      {(overlay, onPick) => (
+                        <div className="camera" onClick={onPick} style={{ maxWidth: 800, cursor: onPick ? "crosshair" : undefined }}>
+                          {/* eslint-disable-next-line @next/next/no-img-element -- object URL of an admin-only picture */}
+                          <img src={url} alt={`ภาพรอบ ${formatDateTime(s.t)}`} width={800} height={600} />
+                          {s.y !== null && (
+                            <div className="camera__line" style={{ top: `${(s.y / 600) * 100}%` }}>
+                              <span>ระบบเห็นผิวน้ำที่แถว {s.y}</span>
+                            </div>
+                          )}
+                          {overlay}
                         </div>
                       )}
-                    </>
+                    </Labeller>
                   ) : (
-                    <div className="camera__empty" role={open.error ? "alert" : "status"}>
-                      {open.error ?? "กำลังโหลดภาพ…"}
+                    <div className="camera" style={{ maxWidth: 800 }}>
+                      <div className="camera__empty" role={open.error ? "alert" : "status"}>
+                        {open.error ?? "กำลังโหลดภาพ…"}
+                      </div>
                     </div>
-                  )}
-                </div>
-              )}
-            </li>
-          ))}
+                  ))}
+              </li>
+            );
+          })}
         </ul>
       )}
     </section>
