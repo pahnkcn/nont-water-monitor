@@ -1,4 +1,5 @@
 import type { GaugeConfig, GaugeMark } from "./gauge-config";
+import { DEFAULT_READER_PARAMS, type ReaderParams } from "./reader-params";
 
 /** Packed RGB24 pixels, row-major. */
 export type RGBFrame = { width: number; height: number; data: Uint8Array };
@@ -52,30 +53,19 @@ export type GaugeReading = {
 // above each row, not once for the whole gauge: in the morning the top of the gauge is lit by the sky
 // behind it while the foot is in shade, and at night the lamp-lit water under the gauge is nearly as
 // bright as the face (it reflects it) but warmer in colour.
+// How white, how sharp an edge and how much of a mat it takes are ReaderParams (lib/reader-params.ts),
+// which /admin can tune on labelled rounds. Leaves in the blue shade of a morning sky lose their
+// green, but not their edges: open water under the face is even (0.06-0.45 of the face's white
+// between its 10th and 90th percentile brightness on the real frames), a mat of stems and leaves is
+// not (0.6-0.83), hence busyUnder.
 const WINDOW = 12; // rows (~6 cm) compared either side of a candidate waterline
 const REF_ROWS = 24; // rows above a candidate that show how the dry face looks there...
 const REF_GAP = 2; // ...leaving out the ones right above it, often wet
-const WHITE_OF_FACE = 0.8; // a face pixel is at least this bright against the face above...
-const WHITE_TINT = 0.05; // ...and this close to its colour (distance between rgb shares)
-const FACE_MIN = 0.2; // share of white pixels above a waterline; the marks cover much of the rest
-const WATER_MAX = 0.08; // and below it
-const WATER_SOFT = 0.15; // below it when nothing passes WATER_MAX...
-const DROP_MIN = 0.15; // ...as long as the share drops by this much
-const REFINE_ROWS = 8; // the line goes where the contrast peaks this close under the first match
 const MIN_CONTRAST = 0.2;
 const MAX_SPREAD_PX = 6; // ~3 cm between frames
 const COVERED_SPREAD_PX = 40; // stems sway between frames (32 px seen), and the row only bounds the water
 // The low zone: rows past the bottom of the axis, the shaded foot of the gauge.
 const LOW_ZONE_PX = 50; // about 25 cm
-// Things in front of the gauge: the blue pipe, the red rope, water hyacinth.
-const HIDDEN_ROW = 0.5; // share of a row's pixels that hides the row
-const PLANT_RUN = 8; // hidden rows in a row under the face's end that hide the water
-const PLANTS_UNDER = 16; // rows under the face's end that tell open water from plants
-const PLANTS_COVER = 0.2; // share of plant pixels there that hides the water
-// Leaves in the blue shade of a morning sky lose their green, but not their edges: open water
-// under the face is even (0.06-0.45 of the face's white between its 10th and 90th percentile
-// brightness on the real frames), a mat of stems and leaves is not (0.6-0.83).
-const BUSY_UNDER = 0.55;
 // A leaf can lean over a dry face; the face then carries on under it.
 const RESUME_ROWS = 16;
 const RESUME_WHITE = 0.2;
@@ -104,7 +94,7 @@ const PLANT = 1;
 const OBJECT = 2;
 
 /** One sampled pixel: brightness, red and green shares of its colour, and what hides it if anything. */
-type Px = { luma: number; sat: number; r: number; g: number; hidden: 0 | typeof PLANT | typeof OBJECT };
+export type Px = { luma: number; sat: number; r: number; g: number; hidden: 0 | typeof PLANT | typeof OBJECT };
 
 function hue(r: number, g: number, b: number) {
   const max = Math.max(r, g, b);
@@ -144,27 +134,20 @@ function sampleRow(frame: RGBFrame, cfg: GaugeConfig, y: number): Px[] {
 
 function percentile(values: number[], p: number) {
   if (!values.length) return 0;
-  const sorted = [...values].sort((a, b) => a - b);
+  const sorted = Float64Array.from(values).sort(); // numeric, and far quicker than a comparator
   return sorted[Math.min(sorted.length - 1, Math.floor(p * sorted.length))];
 }
 
 /** How the dry face looks in some rows: the brightness of its white and the colour of that white. */
 type Face = { white: number; r: number; g: number };
 
-function learnFace(px: Px[]): Face {
-  // A floor keeps the grain of a dim picture from passing for white.
-  const white = Math.max(
-    WHITE_MIN,
-    percentile(
-      px.map((p) => p.luma),
-      0.9,
-    ),
-  );
+/** `white` is given when already known for these pixels. */
+function learnFace(px: Px[], params: ReaderParams, white = faceWhite(px)): Face {
   let r = 0;
   let g = 0;
   let n = 0;
   for (const p of px) {
-    if (p.luma < WHITE_OF_FACE * white) continue;
+    if (p.luma < params.whiteOfFace * white) continue;
     r += p.r;
     g += p.g;
     n++;
@@ -172,11 +155,23 @@ function learnFace(px: Px[]): Face {
   return { white, r: n ? r / n : 1 / 3, g: n ? g / n : 1 / 3 };
 }
 
-function isWhite(p: Px, face: Face) {
-  if (p.luma < WHITE_OF_FACE * face.white) return false;
+// A floor keeps the grain of a dim picture from passing for white.
+function faceWhite(px: Px[]) {
+  return Math.max(
+    WHITE_MIN,
+    percentile(
+      px.map((p) => p.luma),
+      0.9,
+    ),
+  );
+}
+
+function isWhite(p: Px, face: Face, params: ReaderParams) {
+  if (p.luma < params.whiteOfFace * face.white) return false;
   const dr = p.r - face.r;
   const dg = p.g - face.g;
-  return Math.hypot(dr, dg, dr + dg) <= WHITE_TINT; // the blue share moves by -(dr + dg)
+  // The blue share moves by -(dr + dg). Squared, as this runs for every pixel of every candidate row.
+  return dr * dr + dg * dg + (dr + dg) * (dr + dg) <= params.whiteTint * params.whiteTint;
 }
 
 export function frameMeanLuma(frame: RGBFrame) {
@@ -189,18 +184,41 @@ export function frameMeanLuma(frame: RGBFrame) {
   return n ? sum / n : 0;
 }
 
-export function detectWaterline(frame: RGBFrame, cfg: GaugeConfig): WaterlineResult {
-  const none = { y: null, aboveTop: false, belowRange: false, covered: false, approx: false, contrast: 0 };
-  if (frameMeanLuma(frame) < DARK_LUMA) return { ...none, dark: true, baselineOk: false };
+/**
+ * The pixels the reader looks at, one row across the face per image row from the top of the axis
+ * to the end of the low zone. They do not depend on ReaderParams, so tuning samples each frame once.
+ */
+export type GaugeSample = { dark: boolean; rows: Px[][] };
 
-  const top = cfg.axis.top.y;
+/**
+ * The white of the face over each candidate row of a sample, by the hiddenRow it was worked out
+ * with (that alone decides which rows are in view). Tuning reads one sample hundreds of times.
+ */
+const whites = new WeakMap<GaugeSample, Map<string, number>>();
+
+export function sampleGauge(frame: RGBFrame, cfg: GaugeConfig): GaugeSample {
+  if (frameMeanLuma(frame) < DARK_LUMA) return { dark: true, rows: [] };
   const last = Math.min(frame.height - 1, cfg.axis.bottom.y + LOW_ZONE_PX);
   const rows: Px[][] = [];
-  for (let y = top; y <= last; y++) rows.push(sampleRow(frame, cfg, y));
+  for (let y = cfg.axis.top.y; y <= last; y++) rows.push(sampleRow(frame, cfg, y));
+  return { dark: false, rows };
+}
+
+export function detectWaterline(frame: RGBFrame, cfg: GaugeConfig, params = DEFAULT_READER_PARAMS): WaterlineResult {
+  return detectInSample(sampleGauge(frame, cfg), cfg, params);
+}
+
+export function detectInSample(sample: GaugeSample, cfg: GaugeConfig, params = DEFAULT_READER_PARAMS): WaterlineResult {
+  const none = { y: null, aboveTop: false, belowRange: false, covered: false, approx: false, contrast: 0 };
+  if (sample.dark) return { ...none, dark: true, baselineOk: false };
+
+  const { rows } = sample;
+  const top = cfg.axis.top.y;
+  const last = top + rows.length - 1;
   const hiddenShare = (row: Px[], kind?: Px["hidden"]) =>
     row.length ? row.filter((p) => (kind ? p.hidden === kind : p.hidden)).length / row.length : 1;
-  const hiddenRow = rows.map((row) => hiddenShare(row) >= HIDDEN_ROW);
-  const plantRow = rows.map((row) => hiddenShare(row, PLANT) >= HIDDEN_ROW);
+  const hiddenRow = rows.map((row) => hiddenShare(row) >= params.hiddenRow);
+  const plantRow = rows.map((row) => hiddenShare(row, PLANT) >= params.hiddenRow);
 
   /** Does the face look like a gauge on the baseline rows above `wetFrom`? */
   const baselineAbove = (wetFrom: number) => {
@@ -215,8 +233,8 @@ export function detectWaterline(frame: RGBFrame, cfg: GaugeConfig): WaterlineRes
     // Too few rows left is not proof of a gauge: a camera turned to a dark wall looks the same
     // (a few bright rows, then "water"). Water over the very top is reported as aboveTop instead.
     if (n < BASELINE_MIN_ROWS || !px.length) return false;
-    const face = learnFace(px);
-    const whites = px.filter((p) => isWhite(p, face));
+    const face = learnFace(px, params);
+    const whites = px.filter((p) => isWhite(p, face, params));
     const marks = px.filter((p) => p.luma <= MARK_OF_FACE * face.white).length;
     return (
       face.white >= FACE_LUMA_MIN &&
@@ -233,13 +251,22 @@ export function detectWaterline(frame: RGBFrame, cfg: GaugeConfig): WaterlineRes
   // across a dry face is stepped over.
   let seen = rows.map((_, k) => k).filter((k) => !hiddenRow[k]);
 
-  /** The face over the rows above position `j` of `seen`. */
+  /** The face over the rows above position `j` of `seen`. Cutting `seen` short below keeps these. */
+  const faces = new Map<number, Face>();
+  let knownWhite = whites.get(sample);
+  if (!knownWhite) whites.set(sample, (knownWhite = new Map()));
   const faceAbove = (j: number) => {
+    let face = faces.get(j);
+    if (face) return face;
     const px: Px[] = [];
     for (let q = Math.max(0, j - REF_GAP - REF_ROWS); q < Math.max(1, j - REF_GAP); q++) {
       if (q < seen.length) px.push(...rows[seen[q]].filter((p) => !p.hidden));
     }
-    return learnFace(px);
+    const key = `${params.hiddenRow}:${j}`;
+    let white = knownWhite.get(key);
+    if (white === undefined) knownWhite.set(key, (white = faceWhite(px)));
+    faces.set(j, (face = learnFace(px, params, white)));
+    return face;
   };
   /** Share of white pixels in positions from-to of `seen`; `all` counts hidden pixels as not white. */
   const whiteShare = (from: number, to: number, face: Face, all = false) => {
@@ -252,21 +279,26 @@ export function detectWaterline(frame: RGBFrame, cfg: GaugeConfig): WaterlineRes
           continue;
         }
         n++;
-        if (isWhite(p, face)) w++;
+        if (isWhite(p, face, params)) w++;
       }
     }
     return n ? w / n : 0;
   };
   /** Share of white above position `j` minus below it: plants under the line count as not white. */
+  const edges = new Map<number, { above: number; below: number }>();
   const edgeAt = (j: number) => {
+    let edge = edges.get(j);
+    if (edge) return edge;
     const face = faceAbove(j);
-    return { above: whiteShare(j - WINDOW, j, face), below: whiteShare(j, j + WINDOW, face, true) };
+    edge = { above: whiteShare(j - WINDOW, j, face), below: whiteShare(j, j + WINDOW, face, true) };
+    edges.set(j, edge);
+    return edge;
   };
 
   // Water over the top rows: nothing near grey and bright there, the colour of the river instead.
   const topRows = seen.slice(0, WINDOW).flatMap((k) => rows[k].filter((p) => !p.hidden));
   const greyShare = topRows.filter((p) => p.luma >= FACE_LUMA_MIN && p.sat <= FACE_SAT_MAX).length / (topRows.length || 1);
-  if (greyShare < WATER_MAX) return { ...none, y: top, aboveTop: true, dark: false, baselineOk: false };
+  if (greyShare < params.waterMax) return { ...none, y: top, aboveTop: true, dark: false, baselineOk: false };
 
   // Plants float on the water, so the face cannot be dry under a mat of them. A run of plant rows
   // (the last rows scanned included) only lets the scan go on when the face clearly carries on under it.
@@ -276,7 +308,7 @@ export function detectWaterline(frame: RGBFrame, cfg: GaugeConfig): WaterlineRes
     const gap = next - seen[q - 1] - 1;
     let plants = 0;
     for (let k = seen[q - 1] + 1; k < next; k++) if (plantRow[k]) plants++;
-    if (gap < PLANT_RUN || plants * 2 < gap) continue;
+    if (gap < params.plantRun || plants * 2 < gap) continue;
     const face = faceAbove(q);
     const below = seen.slice(q, q + RESUME_ROWS).flatMap((k) => rows[k]);
     const resumes =
@@ -285,17 +317,20 @@ export function detectWaterline(frame: RGBFrame, cfg: GaugeConfig): WaterlineRes
       below.filter((p) => p.hidden === PLANT).length <= RESUME_PLANTS * below.length;
     if (!resumes) mat = q;
   }
-  if (mat !== -1) seen = seen.slice(0, mat);
+  if (mat !== -1) {
+    seen = seen.slice(0, mat);
+    edges.clear(); // the rows under an edge are cut short too
+  }
 
   /** The first place the face gives way to something darker, moved to where the contrast peaks. */
   const firstEdge = (fits: (above: number, below: number) => boolean) => {
     for (let j = WINDOW; j < seen.length; j++) {
       const { above, below } = edgeAt(j);
-      if (above < FACE_MIN || !fits(above, below)) continue;
+      if (above < params.faceMin || !fits(above, below)) continue;
       // The first match can be a row or two early, while the window under it still holds some face.
       let edge = j;
       let contrast = above - below;
-      for (let q = j + 1; q < Math.min(seen.length, j + REFINE_ROWS + 1); q++) {
+      for (let q = j + 1; q < Math.min(seen.length, j + params.refineRows + 1); q++) {
         const e = edgeAt(q);
         if (e.above - e.below > contrast) {
           edge = q;
@@ -310,8 +345,8 @@ export function detectWaterline(frame: RGBFrame, cfg: GaugeConfig): WaterlineRes
   // from looking empty, and the strongest drop is no answer: under a mat the reference sinks with the
   // light, and anything pale down there out-scores the real edge.
   let found =
-    firstEdge((_, below) => below <= WATER_MAX) ??
-    firstEdge((above, below) => below <= WATER_SOFT && above - below >= DROP_MIN);
+    firstEdge((_, below) => below <= params.waterMax) ??
+    firstEdge((above, below) => below <= params.waterSoft && above - below >= params.dropMin);
   // The face runs into a plant mat without a clear edge.
   if (!found && mat !== -1) found = { edge: seen.length, contrast: edgeAt(seen.length).above };
   // No drop anywhere: the face carries on to the last row scanned, and the water is lower still.
@@ -321,13 +356,13 @@ export function detectWaterline(frame: RGBFrame, cfg: GaugeConfig): WaterlineRes
   const lastFace = seen[edge - 1];
   const firstWet = edge < seen.length ? seen[edge] : rows.length;
   // The face ends at something afloat (a pipe, plants) rather than at open water.
-  const under = rows.slice(lastFace + 1, lastFace + 1 + PLANTS_UNDER).flat();
+  const under = rows.slice(lastFace + 1, lastFace + 1 + params.plantsUnder).flat();
   const lumas = under.map((p) => p.luma);
   const busy = (percentile(lumas, 0.9) - percentile(lumas, 0.1)) / faceAbove(edge).white;
   const covered =
-    firstWet - lastFace - 1 >= PLANT_RUN ||
-    under.filter((p) => p.hidden === PLANT).length >= PLANTS_COVER * (under.length || 1) ||
-    busy >= BUSY_UNDER;
+    firstWet - lastFace - 1 >= params.plantRun ||
+    under.filter((p) => p.hidden === PLANT).length >= params.plantsCover * (under.length || 1) ||
+    busy >= params.busyUnder;
   const y = top + (covered ? lastFace + 1 : firstWet);
   return {
     y,
@@ -374,8 +409,8 @@ function median(values: number[]) {
 }
 
 /** Read several frames from the same moment and agree on one level. */
-export function readGauge(frames: RGBFrame[], cfg: GaugeConfig): GaugeReading {
-  const results = frames.map((f) => detectWaterline(f, cfg));
+export function readGauge(frames: RGBFrame[], cfg: GaugeConfig, params = DEFAULT_READER_PARAMS): GaugeReading {
+  const results = frames.map((f) => detectWaterline(f, cfg, params));
   const base = { aboveTop: false, belowRange: false, covered: false, approx: false, frames: results };
   if (!results.length) return { ...base, ok: false, level: null, y: null, confidence: "low", reason: "no-frames" };
 

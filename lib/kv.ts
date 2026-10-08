@@ -152,4 +152,6 @@ export const KEYS = {
   gaugeRefs: "gauge:refs",
   suspects: "suspects",
   suspectImages: "suspects:img",
+  labels: "labels",
+  labelImages: "labels:img",
 } as const;
